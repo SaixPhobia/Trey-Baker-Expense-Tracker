@@ -2,9 +2,19 @@ import { Layout } from "@/components/Layout";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Download, Filter } from "lucide-react";
+import { Download, Filter } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ExpensesPage() {
+  const { toast } = useToast();
+
+  const handleExportCSV = () => {
+    toast({
+      title: "Exporting CSV",
+      description: "Your expense report is being generated and will download shortly.",
+    });
+  };
+
   return (
     <Layout>
       <div className="flex flex-col gap-8">
@@ -16,7 +26,11 @@ export default function ExpensesPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2 font-mono text-xs rounded-none">
+            <Button 
+              variant="outline" 
+              className="gap-2 font-mono text-xs rounded-none"
+              onClick={handleExportCSV}
+            >
               <Download className="h-4 w-4" /> Export CSV
             </Button>
           </div>
