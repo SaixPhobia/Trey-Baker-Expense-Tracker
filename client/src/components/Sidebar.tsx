@@ -20,7 +20,7 @@ export function Sidebar() {
           </div>
           <div>
             <h1 className="font-serif text-xl font-bold text-sidebar-foreground tracking-tight leading-none">
-              Pain au Profit
+              Trey Baker
             </h1>
             <p className="text-xs text-muted-foreground mt-1 font-mono uppercase tracking-wider">
               Management
