@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, LogOut, Bell } from "lucide-react";
+import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, Bell, LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +14,14 @@ import { useToast } from "@/hooks/use-toast";
 
 export function Sidebar() {
   const [location] = useLocation();
+  const { toast } = useToast();
+
+  const handleAction = (title: string) => {
+    toast({
+      title,
+      description: "Feature coming soon in the full version.",
+    });
+  };
 
   const links = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -49,14 +57,35 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-border mt-auto">
-        <div className="flex items-center gap-3 px-4 py-2">
-          <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-primary font-bold text-xs">JD</div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate">Jean Dupont</p>
-            <p className="text-[10px] text-muted-foreground truncate">Settings</p>
-          </div>
-          <Settings className="h-3 w-3 text-muted-foreground hover:text-primary cursor-pointer" />
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <div className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-muted/50 transition-colors group">
+              <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-primary font-bold text-xs">JD</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate">Jean Dupont</p>
+                <p className="text-[10px] text-muted-foreground truncate">Settings</p>
+              </div>
+              <Settings className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 rounded-none">
+            <DropdownMenuLabel>Account Settings</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleAction("Profile Settings")}>
+              <User className="mr-2 h-4 w-4" /> Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAction("Notifications")}>
+              <Bell className="mr-2 h-4 w-4" /> Notifications
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAction("Security Settings")}>
+              <Settings className="mr-2 h-4 w-4" /> Security
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive">
+              <LogOut className="mr-2 h-4 w-4" /> Log out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
