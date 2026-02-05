@@ -16,11 +16,8 @@ export default function ExpensesPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2 font-mono text-xs">
+            <Button variant="outline" className="gap-2 font-mono text-xs rounded-none">
               <Download className="h-4 w-4" /> Export CSV
-            </Button>
-            <Button className="gap-2 font-mono text-xs bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="h-4 w-4" /> New Expense
             </Button>
           </div>
         </div>
