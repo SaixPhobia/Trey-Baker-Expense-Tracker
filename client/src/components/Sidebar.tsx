@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, Bell, LogOut } from "lucide-react";
+import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, Bell, LogOut, Package, CakeSlice } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +26,8 @@ export function Sidebar() {
   const links = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/expenses", label: "Expenses", icon: Receipt },
+    { href: "/ingredients", label: "Ingredients", icon: Package },
+    { href: "/menu-items", label: "Menu Items", icon: CakeSlice },
     { href: "/pricing", label: "Price Calculator", icon: Calculator },
   ];
 
@@ -43,14 +45,12 @@ export function Sidebar() {
           const Icon = link.icon;
           const isActive = location === link.href;
           return (
-            <Link key={link.href} href={link.href}>
-              <a className={cn(
-                "flex items-center gap-3 px-4 py-2 text-sm transition-colors",
-                isActive ? "bg-secondary text-primary font-medium" : "text-muted-foreground hover:bg-muted/50"
-              )}>
-                <Icon className="h-4 w-4" />
-                {link.label}
-              </a>
+            <Link key={link.href} href={link.href} className={cn(
+              "flex items-center gap-3 px-4 py-2 text-sm transition-colors",
+              isActive ? "bg-secondary text-primary font-medium" : "text-muted-foreground hover:bg-muted/50"
+            )} data-testid={`nav-${link.label.toLowerCase().replace(/\s+/g, '-')}`}>
+              <Icon className="h-4 w-4" />
+              {link.label}
             </Link>
           );
         })}

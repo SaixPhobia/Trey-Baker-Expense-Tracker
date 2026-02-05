@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { MoreHorizontal, Trash2, CheckCircle2, Clock, Plus } from "lucide-react";
+import { MoreHorizontal, Trash2, CheckCircle2, Clock, Plus, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,18 +35,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Expense, Ingredient } from "@shared/schema";
 
-const initialExpenses = [
-  { id: "EXP001", date: "2024-02-04", category: "Ingredients", description: "Organic Flour (50kg)", amount: 450.00, status: "Approved" },
-  { id: "EXP002", date: "2024-02-04", category: "Packaging", description: "Custom Pastry Boxes", amount: 125.50, status: "Pending" },
-  { id: "EXP003", date: "2024-02-03", category: "Ingredients", description: "Premium Butter (20kg)", amount: 380.00, status: "Approved" },
-  { id: "EXP004", date: "2024-02-02", category: "Utilities", description: "January Electricity", amount: 850.00, status: "Approved" },
-  { id: "EXP005", date: "2024-02-01", category: "Maintenance", description: "Oven Service", amount: 200.00, status: "Pending" },
-];
+const EXPENSE_CATEGORIES = ["Ingredients", "Packaging", "Utilities", "Maintenance", "Marketing", "Labor", "Equipment"];
 
 export function ExpenseTable() {
-  const [expenses, setExpenses] = useState(initialExpenses);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newExpense, setNewExpense] = useState({
     description: "",
@@ -54,51 +50,95 @@ export function ExpenseTable() {
     category: "Ingredients"
   });
 
-  const handleStatusChange = (id: string, newStatus: string) => {
-    setExpenses(prev => prev.map(exp => exp.id === id ? { ...exp, status: newStatus } : exp));
-    toast({
-      title: "Status Updated",
-      description: `Expense ${id} is now ${newStatus}.`,
-    });
-  };
+  const { data: expenses = [], isLoading } = useQuery<Expense[]>({
+    queryKey: ["/api/expenses"],
+    queryFn: async () => {
+      const res = await fetch("/api/expenses");
+      return res.json();
+    }
+  });
 
-  const handleDelete = (id: string) => {
-    setExpenses(prev => prev.filter(exp => exp.id !== id));
-    toast({
-      title: "Expense Deleted",
-      description: `Expense ${id} has been removed.`,
-      variant: "destructive",
-    });
-  };
+  const { data: ingredients = [] } = useQuery<Ingredient[]>({
+    queryKey: ["/api/ingredients"],
+    queryFn: async () => {
+      const res = await fetch("/api/ingredients");
+      return res.json();
+    }
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (expense: { description: string; amount: string; category: string }) => {
+      const res = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...expense, status: "Pending" })
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      setIsDialogOpen(false);
+      setNewExpense({ description: "", amount: "", category: "Ingredients" });
+      toast({ title: "Expense Added", description: "Successfully added new expense entry." });
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await fetch(`/api/expenses/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      toast({ title: "Status Updated", description: `Expense is now ${variables.status}.` });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await fetch(`/api/expenses/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      toast({ title: "Expense Deleted", description: "Expense has been removed.", variant: "destructive" });
+    }
+  });
 
   const handleAddExpense = () => {
     if (!newExpense.description || !newExpense.amount) return;
-
-    const expense = {
-      id: `EXP00${expenses.length + 1}`,
-      date: new Date().toISOString().split('T')[0],
-      category: newExpense.category,
-      description: newExpense.description,
-      amount: parseFloat(newExpense.amount),
-      status: "Pending"
-    };
-
-    setExpenses([expense, ...expenses]);
-    setIsDialogOpen(false);
-    setNewExpense({ description: "", amount: "", category: "Ingredients" });
-    
-    toast({
-      title: "Expense Added",
-      description: "Successfully added new expense entry.",
-    });
+    createMutation.mutate(newExpense);
   };
+
+  const handleSelectIngredient = (ingredientId: string) => {
+    const ingredient = ingredients.find(i => i.id.toString() === ingredientId);
+    if (ingredient) {
+      setNewExpense({
+        ...newExpense,
+        description: `${ingredient.name} (${ingredient.unit})`,
+        amount: ingredient.costPerUnit,
+        category: "Ingredients"
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 font-mono text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded-none">
+            <Button className="gap-2 font-mono text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded-none" data-testid="button-new-expense">
               <Plus className="h-4 w-4" /> New Expense
             </Button>
           </DialogTrigger>
@@ -107,10 +147,28 @@ export function ExpenseTable() {
               <DialogTitle className="font-serif">Add New Expense</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              {ingredients.length > 0 && (
+                <div className="grid gap-2">
+                  <Label>Quick Add from Ingredients</Label>
+                  <Select onValueChange={handleSelectIngredient}>
+                    <SelectTrigger className="rounded-none border-muted">
+                      <SelectValue placeholder="Select an ingredient..." />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none">
+                      {ingredients.map(ing => (
+                        <SelectItem key={ing.id} value={ing.id.toString()}>
+                          {ing.name} - ${ing.costPerUnit}/{ing.unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="description">Description</Label>
                 <Input
                   id="description"
+                  data-testid="input-expense-description"
                   value={newExpense.description}
                   onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
                   placeholder="e.g. Organic Flour"
@@ -122,6 +180,7 @@ export function ExpenseTable() {
                 <Input
                   id="amount"
                   type="number"
+                  data-testid="input-expense-amount"
                   value={newExpense.amount}
                   onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
                   placeholder="0.00"
@@ -138,17 +197,18 @@ export function ExpenseTable() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent className="rounded-none">
-                    <SelectItem value="Ingredients">Ingredients</SelectItem>
-                    <SelectItem value="Packaging">Packaging</SelectItem>
-                    <SelectItem value="Utilities">Utilities</SelectItem>
-                    <SelectItem value="Maintenance">Maintenance</SelectItem>
-                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    {EXPENSE_CATEGORIES.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleAddExpense} className="rounded-none w-full">Add Expense</Button>
+              <Button onClick={handleAddExpense} className="rounded-none w-full" disabled={createMutation.isPending} data-testid="button-submit-expense">
+                {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Add Expense
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -158,7 +218,7 @@ export function ExpenseTable() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
-              <TableHead className="w-[100px] font-serif text-primary font-bold">ID</TableHead>
+              <TableHead className="w-[80px] font-serif text-primary font-bold">ID</TableHead>
               <TableHead className="font-serif text-primary font-bold">Date</TableHead>
               <TableHead className="font-serif text-primary font-bold">Category</TableHead>
               <TableHead className="font-serif text-primary font-bold">Description</TableHead>
@@ -168,47 +228,55 @@ export function ExpenseTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {expenses.map((expense) => (
-              <TableRow key={expense.id} className="hover:bg-muted/20 transition-colors duration-200">
-                <TableCell className="font-mono text-xs text-muted-foreground">{expense.id}</TableCell>
-                <TableCell className="font-mono text-sm">{expense.date}</TableCell>
-                <TableCell>
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-primary">
-                    {expense.category}
-                  </span>
-                </TableCell>
-                <TableCell className="font-medium">{expense.description}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={cn(
-                    "rounded-none border-none font-normal px-2 py-0.5 text-[10px] uppercase tracking-wider",
-                    expense.status === "Approved" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                  )}>
-                    {expense.status === "Approved" ? <CheckCircle2 className="mr-1 h-3 w-3 inline" /> : <Clock className="mr-1 h-3 w-3 inline" />}
-                    {expense.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right font-mono font-medium">
-                  ${expense.amount.toFixed(2)}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="p-1 hover:bg-muted rounded-none transition-colors">
-                        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="rounded-none">
-                      <DropdownMenuItem onClick={() => handleStatusChange(expense.id, expense.status === "Approved" ? "Pending" : "Approved")}>
-                        Mark as {expense.status === "Approved" ? "Pending" : "Approved"}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(expense.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {expenses.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  No expenses yet. Click "New Expense" to add your first entry.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              expenses.map((expense) => (
+                <TableRow key={expense.id} className="hover:bg-muted/20 transition-colors duration-200" data-testid={`row-expense-${expense.id}`}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">#{expense.id}</TableCell>
+                  <TableCell className="font-mono text-sm">{new Date(expense.date).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-primary">
+                      {expense.category}
+                    </span>
+                  </TableCell>
+                  <TableCell className="font-medium">{expense.description}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn(
+                      "rounded-none border-none font-normal px-2 py-0.5 text-[10px] uppercase tracking-wider",
+                      expense.status === "Approved" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                    )}>
+                      {expense.status === "Approved" ? <CheckCircle2 className="mr-1 h-3 w-3 inline" /> : <Clock className="mr-1 h-3 w-3 inline" />}
+                      {expense.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-mono font-medium">
+                    ${parseFloat(expense.amount).toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="p-1 hover:bg-muted rounded-none transition-colors" data-testid={`button-expense-actions-${expense.id}`}>
+                          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="rounded-none">
+                        <DropdownMenuItem onClick={() => updateMutation.mutate({ id: expense.id, status: expense.status === "Approved" ? "Pending" : "Approved" })}>
+                          Mark as {expense.status === "Approved" ? "Pending" : "Approved"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(expense.id)}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

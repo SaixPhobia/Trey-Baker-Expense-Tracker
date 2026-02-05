@@ -9,9 +9,10 @@ export default function ExpensesPage() {
   const { toast } = useToast();
 
   const handleExportCSV = () => {
+    window.open("/api/expenses/export", "_blank");
     toast({
       title: "Exporting CSV",
-      description: "Your expense report is being generated and will download shortly.",
+      description: "Your expense report is being downloaded.",
     });
   };
 
@@ -30,6 +31,7 @@ export default function ExpensesPage() {
               variant="outline" 
               className="gap-2 font-mono text-xs rounded-none"
               onClick={handleExportCSV}
+              data-testid="button-export-csv"
             >
               <Download className="h-4 w-4" /> Export CSV
             </Button>
@@ -41,38 +43,13 @@ export default function ExpensesPage() {
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Search expenses..." 
-              className="pl-9 font-mono text-sm border-muted"
+              className="pl-9 font-mono text-sm border-muted rounded-none"
+              data-testid="input-search-expenses"
             />
-          </div>
-          <div className="flex gap-2 ml-auto">
-             <Button variant="ghost" size="sm" className="text-xs">Filter by Date</Button>
-             <Button variant="ghost" size="sm" className="text-xs">Category</Button>
-             <Button variant="ghost" size="sm" className="text-xs">Status</Button>
           </div>
         </div>
 
         <ExpenseTable />
-        
-        {/* Pagination Mock */}
-        <div className="flex justify-between items-center text-sm text-muted-foreground border-t border-border pt-4">
-          <p>Showing 1-5 of 24 results</p>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => toast({ title: "Pagination", description: "This is a prototype view. Previous page coming in full version." })}
-            >
-              Previous
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => toast({ title: "Pagination", description: "This is a prototype view. Next page coming in full version." })}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
       </div>
     </Layout>
   );
