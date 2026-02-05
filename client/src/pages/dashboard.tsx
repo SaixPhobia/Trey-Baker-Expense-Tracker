@@ -18,21 +18,10 @@ const data = [
 export default function DashboardPage() {
   return (
     <Layout>
-      {/* Hero Section */}
-      <div className="relative h-48 w-full rounded-none overflow-hidden mb-8 group">
-        <div className="absolute inset-0 bg-black/40 z-10 transition-colors duration-500 group-hover:bg-black/30" />
-        <img 
-          src={heroImage} 
-          alt="Bakery Hero" 
-          className="w-full h-full object-cover transform scale-100 group-hover:scale-105 transition-transform duration-700 ease-out"
-        />
-        <div className="absolute inset-0 z-20 flex flex-col justify-center px-8">
-          <h1 className="text-4xl font-serif font-bold text-white tracking-tight mb-2 drop-shadow-md">
-            Good Morning, Chef.
-          </h1>
-          <p className="text-white/90 font-light max-w-lg drop-shadow-sm">
-            Here's what's happening at the bakery today. Operations are running smoothly, with inventory levels optimal for the weekend rush.
-          </p>
+      <div className="relative h-32 w-full overflow-hidden mb-8 border border-border bg-muted/20">
+        <div className="absolute inset-0 flex flex-col justify-center px-8 z-20">
+          <h1 className="text-2xl font-serif font-bold tracking-tight">Welcome, Trey</h1>
+          <p className="text-sm text-muted-foreground">Operational overview for today.</p>
         </div>
       </div>
 
