@@ -57,8 +57,20 @@ export default function ExpensesPage() {
         <div className="flex justify-between items-center text-sm text-muted-foreground border-t border-border pt-4">
           <p>Showing 1-5 of 24 results</p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled>Previous</Button>
-            <Button variant="outline" size="sm">Next</Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => toast({ title: "Pagination", description: "This is a prototype view. Previous page coming in full version." })}
+            >
+              Previous
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => toast({ title: "Pagination", description: "This is a prototype view. Next page coming in full version." })}
+            >
+              Next
+            </Button>
           </div>
         </div>
       </div>
