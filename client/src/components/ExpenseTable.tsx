@@ -47,6 +47,7 @@ export function ExpenseTable() {
   const [newExpense, setNewExpense] = useState({
     description: "",
     amount: "",
+    quantity: "1",
     category: "Ingredients",
     reimbursement: "No",
     submittedBy: ""
@@ -69,7 +70,7 @@ export function ExpenseTable() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (expense: { description: string; amount: string; category: string; reimbursement: string; submittedBy: string }) => {
+    mutationFn: async (expense: { description: string; amount: string; quantity: string; category: string; reimbursement: string; submittedBy: string }) => {
       const res = await fetch("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,7 +81,7 @@ export function ExpenseTable() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
       setIsDialogOpen(false);
-      setNewExpense({ description: "", amount: "", category: "Ingredients", reimbursement: "No", submittedBy: "" });
+      setNewExpense({ description: "", amount: "", quantity: "1", category: "Ingredients", reimbursement: "No", submittedBy: "" });
       toast({ title: "Expense Added", description: "Successfully added new expense entry." });
     }
   });
@@ -188,17 +189,33 @@ export function ExpenseTable() {
                   className="rounded-none border-muted"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="amount">Amount ($)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  data-testid="input-expense-amount"
-                  value={newExpense.amount}
-                  onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
-                  placeholder="0.00"
-                  className="rounded-none border-muted"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="quantity">Quantity</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    step="0.01"
+                    data-testid="input-expense-quantity"
+                    value={newExpense.quantity}
+                    onChange={(e) => setNewExpense({ ...newExpense, quantity: e.target.value })}
+                    placeholder="1"
+                    className="rounded-none border-muted"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="amount">Unit Cost ($)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    data-testid="input-expense-amount"
+                    value={newExpense.amount}
+                    onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
+                    placeholder="0.00"
+                    className="rounded-none border-muted"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
@@ -255,14 +272,16 @@ export function ExpenseTable() {
               <TableHead className="font-serif text-primary font-bold">Description</TableHead>
               <TableHead className="font-serif text-primary font-bold">Status</TableHead>
               <TableHead className="font-serif text-primary font-bold">Reimbursement</TableHead>
-              <TableHead className="text-right font-serif text-primary font-bold">Amount</TableHead>
+              <TableHead className="text-right font-serif text-primary font-bold">Qty</TableHead>
+              <TableHead className="text-right font-serif text-primary font-bold">Unit Cost</TableHead>
+              <TableHead className="text-right font-serif text-primary font-bold">Total</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {expenses.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                   No expenses yet. Click "New Expense" to add your first entry.
                 </TableCell>
               </TableRow>
@@ -299,8 +318,14 @@ export function ExpenseTable() {
                       {expense.reimbursement}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-mono font-medium">
+                  <TableCell className="text-right font-mono text-sm">
+                    {parseFloat(expense.quantity).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
                     ${parseFloat(expense.amount).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono font-medium">
+                    ${(parseFloat(expense.quantity) * parseFloat(expense.amount)).toFixed(2)}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>

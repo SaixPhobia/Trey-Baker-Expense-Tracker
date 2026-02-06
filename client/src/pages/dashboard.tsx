@@ -41,7 +41,7 @@ export default function DashboardPage() {
     }
   });
 
-  const totalExpenses = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+  const totalExpenses = expenses.reduce((sum, exp) => sum + (parseFloat(exp.quantity) * parseFloat(exp.amount)), 0);
   const pendingExpenses = expenses.filter(exp => exp.status === "Pending").length;
   const isLoading = expensesLoading || ingredientsLoading || menuItemsLoading;
 
