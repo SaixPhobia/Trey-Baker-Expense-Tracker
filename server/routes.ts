@@ -133,10 +133,11 @@ export async function registerRoutes(
   // ============ CSV EXPORT ============
   app.get("/api/expenses/export", async (req, res) => {
     const expenses = await storage.getExpenses();
-    const headers = ["ID", "Date", "Category", "Description", "Amount", "Status", "Reimbursement"];
+    const headers = ["ID", "Date", "Submitted By", "Category", "Description", "Amount", "Status", "Reimbursement"];
     const rows = expenses.map(exp => [
       exp.id,
       new Date(exp.date).toLocaleDateString(),
+      exp.submittedBy,
       exp.category,
       exp.description,
       exp.amount,

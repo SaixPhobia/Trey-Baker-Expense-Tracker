@@ -48,7 +48,8 @@ export function ExpenseTable() {
     description: "",
     amount: "",
     category: "Ingredients",
-    reimbursement: "No"
+    reimbursement: "No",
+    submittedBy: ""
   });
 
   const { data: expenses = [], isLoading } = useQuery<Expense[]>({
@@ -68,7 +69,7 @@ export function ExpenseTable() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (expense: { description: string; amount: string; category: string; reimbursement: string }) => {
+    mutationFn: async (expense: { description: string; amount: string; category: string; reimbursement: string; submittedBy: string }) => {
       const res = await fetch("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -79,7 +80,7 @@ export function ExpenseTable() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
       setIsDialogOpen(false);
-      setNewExpense({ description: "", amount: "", category: "Ingredients", reimbursement: "No" });
+      setNewExpense({ description: "", amount: "", category: "Ingredients", reimbursement: "No", submittedBy: "" });
       toast({ title: "Expense Added", description: "Successfully added new expense entry." });
     }
   });
@@ -148,6 +149,17 @@ export function ExpenseTable() {
               <DialogTitle className="font-serif">Add New Expense</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="submittedBy">Your Name</Label>
+                <Input
+                  id="submittedBy"
+                  data-testid="input-expense-submitted-by"
+                  value={newExpense.submittedBy}
+                  onChange={(e) => setNewExpense({ ...newExpense, submittedBy: e.target.value })}
+                  placeholder="e.g. John Smith"
+                  className="rounded-none border-muted"
+                />
+              </div>
               {ingredients.length > 0 && (
                 <div className="grid gap-2">
                   <Label>Quick Add from Ingredients</Label>
@@ -238,6 +250,7 @@ export function ExpenseTable() {
             <TableRow className="bg-muted/30 hover:bg-muted/30">
               <TableHead className="w-[80px] font-serif text-primary font-bold">ID</TableHead>
               <TableHead className="font-serif text-primary font-bold">Date</TableHead>
+              <TableHead className="font-serif text-primary font-bold">Submitted By</TableHead>
               <TableHead className="font-serif text-primary font-bold">Category</TableHead>
               <TableHead className="font-serif text-primary font-bold">Description</TableHead>
               <TableHead className="font-serif text-primary font-bold">Status</TableHead>
@@ -249,7 +262,7 @@ export function ExpenseTable() {
           <TableBody>
             {expenses.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No expenses yet. Click "New Expense" to add your first entry.
                 </TableCell>
               </TableRow>
@@ -258,6 +271,7 @@ export function ExpenseTable() {
                 <TableRow key={expense.id} className="hover:bg-muted/20 transition-colors duration-200" data-testid={`row-expense-${expense.id}`}>
                   <TableCell className="font-mono text-xs text-muted-foreground">#{expense.id}</TableCell>
                   <TableCell className="font-mono text-sm">{new Date(expense.date).toLocaleDateString()}</TableCell>
+                  <TableCell className="font-medium text-sm">{expense.submittedBy || <span className="text-muted-foreground italic">—</span>}</TableCell>
                   <TableCell>
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-primary">
                       {expense.category}
