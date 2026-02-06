@@ -48,6 +48,7 @@ export const expenses = pgTable("expenses", {
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("Pending"), // Pending, Approved
+  reimbursement: text("reimbursement").notNull().default("No"), // No, Requested, Reimbursed
 });
 
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, date: true });

@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { MoreHorizontal, Trash2, CheckCircle2, Clock, Plus, Loader2 } from "lucide-react";
+import { MoreHorizontal, Trash2, CheckCircle2, Clock, Plus, Loader2, RefreshCw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,7 +47,8 @@ export function ExpenseTable() {
   const [newExpense, setNewExpense] = useState({
     description: "",
     amount: "",
-    category: "Ingredients"
+    category: "Ingredients",
+    reimbursement: "No"
   });
 
   const { data: expenses = [], isLoading } = useQuery<Expense[]>({
@@ -67,7 +68,7 @@ export function ExpenseTable() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (expense: { description: string; amount: string; category: string }) => {
+    mutationFn: async (expense: { description: string; amount: string; category: string; reimbursement: string }) => {
       const res = await fetch("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -78,23 +79,23 @@ export function ExpenseTable() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
       setIsDialogOpen(false);
-      setNewExpense({ description: "", amount: "", category: "Ingredients" });
+      setNewExpense({ description: "", amount: "", category: "Ingredients", reimbursement: "No" });
       toast({ title: "Expense Added", description: "Successfully added new expense entry." });
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+    mutationFn: async ({ id, ...data }: { id: number; status?: string; reimbursement?: string }) => {
       const res = await fetch(`/api/expenses/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status })
+        body: JSON.stringify(data)
       });
       return res.json();
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-      toast({ title: "Status Updated", description: `Expense is now ${variables.status}.` });
+      toast({ title: "Expense Updated", description: "Expense has been updated." });
     }
   });
 
@@ -187,21 +188,38 @@ export function ExpenseTable() {
                   className="rounded-none border-muted"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="category">Category</Label>
-                <Select
-                  value={newExpense.category}
-                  onValueChange={(value) => setNewExpense({ ...newExpense, category: value })}
-                >
-                  <SelectTrigger className="rounded-none border-muted">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-none">
-                    {EXPENSE_CATEGORIES.map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={newExpense.category}
+                    onValueChange={(value) => setNewExpense({ ...newExpense, category: value })}
+                  >
+                    <SelectTrigger className="rounded-none border-muted">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none">
+                      {EXPENSE_CATEGORIES.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Reimbursement</Label>
+                  <Select
+                    value={newExpense.reimbursement}
+                    onValueChange={(value) => setNewExpense({ ...newExpense, reimbursement: value })}
+                  >
+                    <SelectTrigger className="rounded-none border-muted">
+                      <SelectValue placeholder="Reimbursement?" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none">
+                      <SelectItem value="No">No</SelectItem>
+                      <SelectItem value="Requested">Requested</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             <DialogFooter>
@@ -223,6 +241,7 @@ export function ExpenseTable() {
               <TableHead className="font-serif text-primary font-bold">Category</TableHead>
               <TableHead className="font-serif text-primary font-bold">Description</TableHead>
               <TableHead className="font-serif text-primary font-bold">Status</TableHead>
+              <TableHead className="font-serif text-primary font-bold">Reimbursement</TableHead>
               <TableHead className="text-right font-serif text-primary font-bold">Amount</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -230,7 +249,7 @@ export function ExpenseTable() {
           <TableBody>
             {expenses.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No expenses yet. Click "New Expense" to add your first entry.
                 </TableCell>
               </TableRow>
@@ -254,6 +273,18 @@ export function ExpenseTable() {
                       {expense.status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn(
+                      "rounded-none border-none font-normal px-2 py-0.5 text-[10px] uppercase tracking-wider",
+                      expense.reimbursement === "Reimbursed" ? "bg-blue-50 text-blue-700" :
+                      expense.reimbursement === "Requested" ? "bg-violet-50 text-violet-700" :
+                      "bg-gray-50 text-gray-500"
+                    )}>
+                      {expense.reimbursement === "Reimbursed" ? <CheckCircle2 className="mr-1 h-3 w-3 inline" /> :
+                       expense.reimbursement === "Requested" ? <RefreshCw className="mr-1 h-3 w-3 inline" /> : null}
+                      {expense.reimbursement}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right font-mono font-medium">
                     ${parseFloat(expense.amount).toFixed(2)}
                   </TableCell>
@@ -268,6 +299,21 @@ export function ExpenseTable() {
                         <DropdownMenuItem onClick={() => updateMutation.mutate({ id: expense.id, status: expense.status === "Approved" ? "Pending" : "Approved" })}>
                           Mark as {expense.status === "Approved" ? "Pending" : "Approved"}
                         </DropdownMenuItem>
+                        {expense.reimbursement === "No" && (
+                          <DropdownMenuItem onClick={() => updateMutation.mutate({ id: expense.id, reimbursement: "Requested" })}>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Request Reimbursement
+                          </DropdownMenuItem>
+                        )}
+                        {expense.reimbursement === "Requested" && (
+                          <DropdownMenuItem onClick={() => updateMutation.mutate({ id: expense.id, reimbursement: "Reimbursed" })}>
+                            <CheckCircle2 className="mr-2 h-4 w-4" /> Mark as Reimbursed
+                          </DropdownMenuItem>
+                        )}
+                        {expense.reimbursement === "Reimbursed" && (
+                          <DropdownMenuItem onClick={() => updateMutation.mutate({ id: expense.id, reimbursement: "No" })}>
+                            Clear Reimbursement
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(expense.id)}>
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
