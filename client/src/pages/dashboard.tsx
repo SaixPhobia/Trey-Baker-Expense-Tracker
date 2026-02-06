@@ -5,6 +5,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import type { Expense, Ingredient, MenuItem } from "@shared/schema";
+import { useAuth } from "@/lib/auth";
 
 const chartData = [
   { name: 'Mon', revenue: 4000, expenses: 2400 },
@@ -17,10 +18,13 @@ const chartData = [
 ];
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const firstName = user?.displayName?.split(" ")[0] || "there";
   const { data: expenses = [], isLoading: expensesLoading } = useQuery<Expense[]>({
     queryKey: ["/api/expenses"],
     queryFn: async () => {
       const res = await fetch("/api/expenses");
+      if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     }
   });
@@ -29,6 +33,7 @@ export default function DashboardPage() {
     queryKey: ["/api/ingredients"],
     queryFn: async () => {
       const res = await fetch("/api/ingredients");
+      if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     }
   });
@@ -37,6 +42,7 @@ export default function DashboardPage() {
     queryKey: ["/api/menu-items"],
     queryFn: async () => {
       const res = await fetch("/api/menu-items");
+      if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     }
   });
@@ -49,7 +55,7 @@ export default function DashboardPage() {
     <Layout>
       <div className="relative h-32 w-full overflow-hidden mb-8 border border-border bg-muted/20">
         <div className="absolute inset-0 flex flex-col justify-center px-8 z-20">
-          <h1 className="text-2xl font-serif font-bold tracking-tight">Welcome, Trey</h1>
+          <h1 className="text-2xl font-serif font-bold tracking-tight">Welcome, {firstName}</h1>
           <p className="text-sm text-muted-foreground">Operational overview for today.</p>
         </div>
       </div>

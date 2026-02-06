@@ -1,7 +1,12 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertIngredientSchema, insertMenuItemSchema, insertExpenseSchema, insertExpenseCategorySchema } from "@shared/schema";
+import { requireAuth, requireRole } from "./auth";
+
+function getParamId(req: Request): number {
+  return parseInt(req.params.id as string);
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -9,12 +14,12 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   // ============ INGREDIENTS ============
-  app.get("/api/ingredients", async (req, res) => {
+  app.get("/api/ingredients", requireAuth, async (req, res) => {
     const ingredients = await storage.getIngredients();
     res.json(ingredients);
   });
 
-  app.post("/api/ingredients", async (req, res) => {
+  app.post("/api/ingredients", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
     const parsed = insertIngredientSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.message });
@@ -23,8 +28,8 @@ export async function registerRoutes(
     res.status(201).json(ingredient);
   });
 
-  app.patch("/api/ingredients/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.patch("/api/ingredients/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
     const updated = await storage.updateIngredient(id, req.body);
     if (!updated) {
       return res.status(404).json({ error: "Ingredient not found" });
@@ -32,19 +37,19 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/ingredients/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.delete("/api/ingredients/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
     await storage.deleteIngredient(id);
     res.status(204).send();
   });
 
   // ============ MENU ITEMS ============
-  app.get("/api/menu-items", async (req, res) => {
+  app.get("/api/menu-items", requireAuth, async (req, res) => {
     const items = await storage.getMenuItems();
     res.json(items);
   });
 
-  app.post("/api/menu-items", async (req, res) => {
+  app.post("/api/menu-items", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
     const parsed = insertMenuItemSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.message });
@@ -53,8 +58,8 @@ export async function registerRoutes(
     res.status(201).json(item);
   });
 
-  app.patch("/api/menu-items/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.patch("/api/menu-items/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
     const updated = await storage.updateMenuItem(id, req.body);
     if (!updated) {
       return res.status(404).json({ error: "Menu item not found" });
@@ -62,19 +67,19 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/menu-items/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.delete("/api/menu-items/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
     await storage.deleteMenuItem(id);
     res.status(204).send();
   });
 
   // ============ EXPENSES ============
-  app.get("/api/expenses", async (req, res) => {
+  app.get("/api/expenses", requireAuth, async (req, res) => {
     const expenses = await storage.getExpenses();
     res.json(expenses);
   });
 
-  app.post("/api/expenses", async (req, res) => {
+  app.post("/api/expenses", requireAuth, async (req, res) => {
     const parsed = insertExpenseSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.message });
@@ -83,8 +88,8 @@ export async function registerRoutes(
     res.status(201).json(expense);
   });
 
-  app.patch("/api/expenses/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.patch("/api/expenses/:id", requireAuth, async (req, res) => {
+    const id = getParamId(req);
     const updated = await storage.updateExpense(id, req.body);
     if (!updated) {
       return res.status(404).json({ error: "Expense not found" });
@@ -92,19 +97,19 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/expenses/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.delete("/api/expenses/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
     await storage.deleteExpense(id);
     res.status(204).send();
   });
 
   // ============ EXPENSE CATEGORIES ============
-  app.get("/api/expense-categories", async (req, res) => {
+  app.get("/api/expense-categories", requireAuth, async (req, res) => {
     const categories = await storage.getExpenseCategories();
     res.json(categories);
   });
 
-  app.post("/api/expense-categories", async (req, res) => {
+  app.post("/api/expense-categories", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
     const parsed = insertExpenseCategorySchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.message });
@@ -113,25 +118,53 @@ export async function registerRoutes(
     res.status(201).json(category);
   });
 
-  app.delete("/api/expense-categories/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.delete("/api/expense-categories/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
     await storage.deleteExpenseCategory(id);
     res.status(204).send();
   });
 
   // ============ PROFILE SETTINGS ============
-  app.get("/api/profile", async (req, res) => {
+  app.get("/api/profile", requireAuth, async (req, res) => {
     const settings = await storage.getProfileSettings();
     res.json(settings);
   });
 
-  app.patch("/api/profile", async (req, res) => {
+  app.patch("/api/profile", requireAuth, requireRole("Owner"), async (req, res) => {
     const updated = await storage.updateProfileSettings(req.body);
     res.json(updated);
   });
 
+  // ============ TEAM MANAGEMENT ============
+  app.get("/api/team", requireAuth, requireRole("Owner"), async (req, res) => {
+    const allUsers = await storage.getAllUsers();
+    res.json(allUsers.map(u => ({
+      id: u.id,
+      username: u.username,
+      displayName: u.displayName,
+      role: u.role,
+    })));
+  });
+
+  app.patch("/api/team/:id/role", requireAuth, requireRole("Owner"), async (req, res) => {
+    const { role } = req.body;
+    if (!["Owner", "Manager", "Staff"].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+    const updated = await storage.updateUserRole(req.params.id as string, role);
+    if (!updated) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json({
+      id: updated.id,
+      username: updated.username,
+      displayName: updated.displayName,
+      role: updated.role,
+    });
+  });
+
   // ============ CSV EXPORT ============
-  app.get("/api/expenses/export", async (req, res) => {
+  app.get("/api/expenses/export", requireAuth, async (req, res) => {
     const expenses = await storage.getExpenses();
     const headers = ["ID", "Date", "Submitted By", "Category", "Description", "Qty", "Unit Cost", "Total", "Status", "Reimbursement"];
     const rows = expenses.map(exp => [

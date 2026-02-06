@@ -37,10 +37,13 @@ import {
 } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Expense, Ingredient } from "@shared/schema";
+import { useAuth } from "@/lib/auth";
 
 const EXPENSE_CATEGORIES = ["Ingredients", "Packaging", "Utilities", "Maintenance", "Marketing", "Labor", "Equipment"];
 
 export function ExpenseTable() {
+  const { user } = useAuth();
+  const canDelete = user?.role === "Owner" || user?.role === "Manager";
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -57,6 +60,7 @@ export function ExpenseTable() {
     queryKey: ["/api/expenses"],
     queryFn: async () => {
       const res = await fetch("/api/expenses");
+      if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     }
   });
@@ -65,6 +69,7 @@ export function ExpenseTable() {
     queryKey: ["/api/ingredients"],
     queryFn: async () => {
       const res = await fetch("/api/ingredients");
+      if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     }
   });
@@ -353,9 +358,11 @@ export function ExpenseTable() {
                             Clear Reimbursement
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(expense.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
+                        {canDelete && (
+                          <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(expense.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

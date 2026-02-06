@@ -24,10 +24,13 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import type { MenuItem } from "@shared/schema";
+import { useAuth } from "@/lib/auth";
 
 const MENU_CATEGORIES = ["Food", "Drinks", "Seasonal Food", "Seasonal Drinks"];
 
 export default function MenuItemsPage() {
+  const { user } = useAuth();
+  const canManage = user?.role === "Owner" || user?.role === "Manager";
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -42,6 +45,7 @@ export default function MenuItemsPage() {
     queryKey: ["/api/menu-items"],
     queryFn: async () => {
       const res = await fetch("/api/menu-items");
+      if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     }
   });
@@ -95,7 +99,7 @@ export default function MenuItemsPage() {
               Manage your bakery's menu with prices. Use the Price Calculator to determine optimal pricing based on ingredient costs.
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          {canManage && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 font-mono text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded-none" data-testid="button-new-menu-item">
                 <Plus className="h-4 w-4" /> New Menu Item
@@ -167,7 +171,7 @@ export default function MenuItemsPage() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+          </Dialog>}
         </div>
 
         {isLoading ? (
@@ -198,17 +202,19 @@ export default function MenuItemsPage() {
                           <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
                         </CardContent>
                       )}
-                      <CardFooter className="pt-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive ml-auto"
-                          onClick={() => deleteMutation.mutate(item.id)}
-                          data-testid={`button-delete-menu-item-${item.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" /> Remove
-                        </Button>
-                      </CardFooter>
+                      {canManage && (
+                        <CardFooter className="pt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive ml-auto"
+                            onClick={() => deleteMutation.mutate(item.id)}
+                            data-testid={`button-delete-menu-item-${item.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" /> Remove
+                          </Button>
+                        </CardFooter>
+                      )}
                     </Card>
                   ))}
                 </div>

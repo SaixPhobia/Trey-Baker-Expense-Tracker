@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, Bell, LogOut, Package, CakeSlice, Shield } from "lucide-react";
+import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, Bell, LogOut, Package, CakeSlice, Shield, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,21 +9,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useQuery } from "@tanstack/react-query";
-import type { ProfileSettings } from "@shared/schema";
+import { useAuth } from "@/lib/auth";
 
 export function Sidebar() {
   const [location, setLocation] = useLocation();
+  const { user, logout } = useAuth();
 
-  const { data: profile } = useQuery<ProfileSettings>({
-    queryKey: ["/api/profile"],
-    queryFn: async () => {
-      const res = await fetch("/api/profile");
-      return res.json();
-    }
-  });
-
-  const displayName = profile?.name || "Jean Dupont";
+  const displayName = user?.displayName || "User";
   const initials = displayName.split(" ").map((n: string) => n[0]).join("");
 
   const links = [
@@ -32,6 +24,7 @@ export function Sidebar() {
     { href: "/ingredients", label: "Ingredients", icon: Package },
     { href: "/menu-items", label: "Menu Items", icon: CakeSlice },
     { href: "/pricing", label: "Price Calculator", icon: Calculator },
+    ...(user?.role === "Owner" ? [{ href: "/team", label: "Team", icon: Users }] : []),
   ];
 
   return (
@@ -66,7 +59,7 @@ export function Sidebar() {
               <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-primary font-bold text-xs">{initials}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium truncate">{displayName}</p>
-                <p className="text-[10px] text-muted-foreground truncate">Settings</p>
+                <p className="text-[10px] text-muted-foreground truncate">{user?.role || "Staff"}</p>
               </div>
               <Settings className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
@@ -84,7 +77,7 @@ export function Sidebar() {
               <Shield className="mr-2 h-4 w-4" /> Security
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem className="text-destructive" onClick={() => logout()} data-testid="button-logout">
               <LogOut className="mr-2 h-4 w-4" /> Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

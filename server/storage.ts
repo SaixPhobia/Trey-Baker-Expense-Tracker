@@ -11,44 +11,41 @@ import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
-  // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  createUserWithRole(user: InsertUser, role: string): Promise<User>;
+  getUserCount(): Promise<number>;
+  updateUserRole(id: string, role: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   
-  // Ingredients
   getIngredients(): Promise<Ingredient[]>;
   getIngredient(id: number): Promise<Ingredient | undefined>;
   createIngredient(ingredient: InsertIngredient): Promise<Ingredient>;
   updateIngredient(id: number, ingredient: Partial<InsertIngredient>): Promise<Ingredient | undefined>;
   deleteIngredient(id: number): Promise<boolean>;
   
-  // Menu Items
   getMenuItems(): Promise<MenuItem[]>;
   getMenuItem(id: number): Promise<MenuItem | undefined>;
   createMenuItem(item: InsertMenuItem): Promise<MenuItem>;
   updateMenuItem(id: number, item: Partial<InsertMenuItem>): Promise<MenuItem | undefined>;
   deleteMenuItem(id: number): Promise<boolean>;
   
-  // Expenses
   getExpenses(): Promise<Expense[]>;
   getExpense(id: number): Promise<Expense | undefined>;
   createExpense(expense: InsertExpense): Promise<Expense>;
   updateExpense(id: number, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
   deleteExpense(id: number): Promise<boolean>;
   
-  // Expense Categories
   getExpenseCategories(): Promise<ExpenseCategory[]>;
   createExpenseCategory(category: InsertExpenseCategory): Promise<ExpenseCategory>;
   deleteExpenseCategory(id: number): Promise<boolean>;
 
-  // Profile Settings
   getProfileSettings(): Promise<ProfileSettings>;
   updateProfileSettings(settings: Partial<InsertProfileSettings>): Promise<ProfileSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // Users
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -60,11 +57,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+    const [user] = await db.insert(users).values({
+      username: insertUser.username,
+      password: insertUser.password,
+      displayName: insertUser.displayName || insertUser.username,
+    }).returning();
     return user;
   }
 
-  // Ingredients
+  async createUserWithRole(insertUser: InsertUser, role: string): Promise<User> {
+    const [user] = await db.insert(users).values({
+      username: insertUser.username,
+      password: insertUser.password,
+      displayName: insertUser.displayName || insertUser.username,
+      role,
+    }).returning();
+    return user;
+  }
+
+  async getUserCount(): Promise<number> {
+    const result = await db.select().from(users);
+    return result.length;
+  }
+
+  async updateUserRole(id: string, role: string): Promise<User | undefined> {
+    const [updated] = await db.update(users).set({ role }).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
   async getIngredients(): Promise<Ingredient[]> {
     return db.select().from(ingredients);
   }
@@ -85,11 +109,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteIngredient(id: number): Promise<boolean> {
-    const result = await db.delete(ingredients).where(eq(ingredients.id, id));
+    await db.delete(ingredients).where(eq(ingredients.id, id));
     return true;
   }
 
-  // Menu Items
   async getMenuItems(): Promise<MenuItem[]> {
     return db.select().from(menuItems);
   }
@@ -114,7 +137,6 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  // Expenses
   async getExpenses(): Promise<Expense[]> {
     return db.select().from(expenses).orderBy(desc(expenses.date));
   }
@@ -139,7 +161,6 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  // Expense Categories
   async getExpenseCategories(): Promise<ExpenseCategory[]> {
     return db.select().from(expenseCategories);
   }
@@ -154,7 +175,6 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  // Profile Settings
   async getProfileSettings(): Promise<ProfileSettings> {
     const [settings] = await db.select().from(profileSettings);
     if (!settings) {

@@ -30,11 +30,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Ingredient } from "@shared/schema";
+import { useAuth } from "@/lib/auth";
 
 const INGREDIENT_CATEGORIES = ["Flour", "Dairy", "Eggs", "Sugar", "Fats", "Fruits", "Nuts", "Chocolate", "Spices", "Other"];
 const UNITS = ["kg", "g", "L", "ml", "dozen", "unit", "lb", "oz"];
 
 export default function IngredientsPage() {
+  const { user } = useAuth();
+  const canManage = user?.role === "Owner" || user?.role === "Manager";
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -50,6 +53,7 @@ export default function IngredientsPage() {
     queryKey: ["/api/ingredients"],
     queryFn: async () => {
       const res = await fetch("/api/ingredients");
+      if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     }
   });
@@ -96,7 +100,7 @@ export default function IngredientsPage() {
               Manage your ingredient inventory and costs. These will appear as quick-select options when adding expenses.
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          {canManage && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 font-mono text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded-none" data-testid="button-new-ingredient">
                 <Plus className="h-4 w-4" /> New Ingredient
@@ -186,7 +190,7 @@ export default function IngredientsPage() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+          </Dialog>}
         </div>
 
         {isLoading ? (
@@ -204,7 +208,7 @@ export default function IngredientsPage() {
                   <TableHead className="font-serif text-primary font-bold">Unit</TableHead>
                   <TableHead className="text-right font-serif text-primary font-bold">Cost per Unit</TableHead>
                   <TableHead className="text-right font-serif text-primary font-bold">Total Cost</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  {canManage && <TableHead className="w-[50px]"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -232,17 +236,19 @@ export default function IngredientsPage() {
                       <TableCell className="text-right font-mono font-medium">
                         ${(parseFloat(ingredient.quantity) * parseFloat(ingredient.costPerUnit)).toFixed(2)}
                       </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => deleteMutation.mutate(ingredient.id)}
-                          data-testid={`button-delete-ingredient-${ingredient.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+                      {canManage && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => deleteMutation.mutate(ingredient.id)}
+                            data-testid={`button-delete-ingredient-${ingredient.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
