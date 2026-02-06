@@ -25,7 +25,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import type { MenuItem } from "@shared/schema";
 
-const MENU_CATEGORIES = ["Bread", "Pastry", "Cake", "Cookies", "Muffins", "Croissants", "Specialty", "Seasonal"];
+const MENU_CATEGORIES = ["Food", "Drinks", "Seasonal Food", "Seasonal Drinks"];
 
 export default function MenuItemsPage() {
   const { toast } = useToast();
@@ -35,7 +35,7 @@ export default function MenuItemsPage() {
     name: "",
     description: "",
     basePrice: "",
-    category: "Bread"
+    category: "Food"
   });
 
   const { data: menuItems = [], isLoading } = useQuery<MenuItem[]>({
@@ -58,7 +58,7 @@ export default function MenuItemsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
       setIsDialogOpen(false);
-      setNewItem({ name: "", description: "", basePrice: "", category: "Bread" });
+      setNewItem({ name: "", description: "", basePrice: "", category: "Food" });
       toast({ title: "Menu Item Added", description: "Successfully added new menu item." });
     }
   });
