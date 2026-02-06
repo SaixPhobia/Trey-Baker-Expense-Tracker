@@ -9,6 +9,11 @@ const PgSession = connectPgSimple(session);
 
 export function setupAuth(app: Express) {
   const isProduction = process.env.NODE_ENV === "production";
+
+  if (isProduction) {
+    app.set("trust proxy", 1);
+  }
+
   app.use(
     session({
       store: new PgSession({
@@ -29,65 +34,71 @@ export function setupAuth(app: Express) {
     })
   );
 
-  if (isProduction) {
-    app.set("trust proxy", 1);
-  }
-
   app.post("/api/auth/register", async (req: Request, res: Response) => {
-    const { username, password, displayName } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: "Username and password are required" });
+    try {
+      const { username, password, displayName } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required" });
+      }
+
+      const existing = await storage.getUserByUsername(username);
+      if (existing) {
+        return res.status(409).json({ error: "Username already taken" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const userCount = await storage.getUserCount();
+      const role = userCount === 0 ? "Owner" : "Staff";
+
+      const user = await storage.createUserWithRole({
+        username,
+        password: hashedPassword,
+        displayName: displayName || username,
+      }, role);
+
+      (req.session as any).userId = user.id;
+
+      res.status(201).json({
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        role: user.role,
+      });
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      res.status(500).json({ error: "Registration failed. Please try again." });
     }
-
-    const existing = await storage.getUserByUsername(username);
-    if (existing) {
-      return res.status(409).json({ error: "Username already taken" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const userCount = await storage.getUserCount();
-    const role = userCount === 0 ? "Owner" : "Staff";
-
-    const user = await storage.createUserWithRole({
-      username,
-      password: hashedPassword,
-      displayName: displayName || username,
-    }, role);
-
-    (req.session as any).userId = user.id;
-
-    res.status(201).json({
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      role: user.role,
-    });
   });
 
   app.post("/api/auth/login", async (req: Request, res: Response) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: "Username and password are required" });
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+
+      (req.session as any).userId = user.id;
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        role: user.role,
+      });
+    } catch (err: any) {
+      console.error("Login error:", err);
+      res.status(500).json({ error: "Login failed. Please try again." });
     }
-
-    const user = await storage.getUserByUsername(username);
-    if (!user) {
-      return res.status(401).json({ error: "Invalid username or password" });
-    }
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return res.status(401).json({ error: "Invalid username or password" });
-    }
-
-    (req.session as any).userId = user.id;
-
-    res.json({
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      role: user.role,
-    });
   });
 
   app.post("/api/auth/logout", (req: Request, res: Response) => {
