@@ -9,6 +9,7 @@ import ExpensesPage from "@/pages/expenses";
 import PricingPage from "@/pages/pricing";
 import IngredientsPage from "@/pages/ingredients";
 import MenuItemsPage from "@/pages/menu-items";
+import SettingsPage from "@/pages/settings";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/ingredients" component={IngredientsPage} />
       <Route path="/menu-items" component={MenuItemsPage} />
       <Route path="/pricing" component={PricingPage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );

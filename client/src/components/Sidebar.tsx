@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, Bell, LogOut, Package, CakeSlice } from "lucide-react";
+import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, Bell, LogOut, Package, CakeSlice, Shield } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,18 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
 
 export function Sidebar() {
-  const [location] = useLocation();
-  const { toast } = useToast();
-
-  const handleAction = (title: string) => {
-    toast({
-      title,
-      description: "Feature coming soon in the full version.",
-    });
-  };
+  const [location, setLocation] = useLocation();
 
   const links = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -71,14 +61,14 @@ export function Sidebar() {
           <DropdownMenuContent align="end" className="w-56 rounded-none">
             <DropdownMenuLabel>Account Settings</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleAction("Profile Settings")}>
+            <DropdownMenuItem onClick={() => setLocation("/settings?tab=profile")}>
               <User className="mr-2 h-4 w-4" /> Profile
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleAction("Notifications")}>
+            <DropdownMenuItem onClick={() => setLocation("/settings?tab=notifications")}>
               <Bell className="mr-2 h-4 w-4" /> Notifications
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleAction("Security Settings")}>
-              <Settings className="mr-2 h-4 w-4" /> Security
+            <DropdownMenuItem onClick={() => setLocation("/settings?tab=security")}>
+              <Shield className="mr-2 h-4 w-4" /> Security
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive">
