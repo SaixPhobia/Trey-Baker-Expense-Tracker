@@ -40,6 +40,7 @@ export default function IngredientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newIngredient, setNewIngredient] = useState({
     name: "",
+    quantity: "",
     unit: "kg",
     costPerUnit: "",
     category: "Flour"
@@ -65,7 +66,7 @@ export default function IngredientsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
       setIsDialogOpen(false);
-      setNewIngredient({ name: "", unit: "kg", costPerUnit: "", category: "Flour" });
+      setNewIngredient({ name: "", quantity: "", unit: "kg", costPerUnit: "", category: "Flour" });
       toast({ title: "Ingredient Added", description: "Successfully added new ingredient." });
     }
   });
@@ -81,7 +82,7 @@ export default function IngredientsPage() {
   });
 
   const handleAddIngredient = () => {
-    if (!newIngredient.name || !newIngredient.costPerUnit) return;
+    if (!newIngredient.name || !newIngredient.costPerUnit || !newIngredient.quantity) return;
     createMutation.mutate(newIngredient);
   };
 
@@ -117,7 +118,20 @@ export default function IngredientsPage() {
                     className="rounded-none border-muted"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      step="0.01"
+                      data-testid="input-ingredient-quantity"
+                      value={newIngredient.quantity}
+                      onChange={(e) => setNewIngredient({ ...newIngredient, quantity: e.target.value })}
+                      placeholder="0"
+                      className="rounded-none border-muted"
+                    />
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="costPerUnit">Cost per Unit ($)</Label>
                     <Input
@@ -186,15 +200,17 @@ export default function IngredientsPage() {
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
                   <TableHead className="font-serif text-primary font-bold">Name</TableHead>
                   <TableHead className="font-serif text-primary font-bold">Category</TableHead>
+                  <TableHead className="text-right font-serif text-primary font-bold">Quantity</TableHead>
                   <TableHead className="font-serif text-primary font-bold">Unit</TableHead>
                   <TableHead className="text-right font-serif text-primary font-bold">Cost per Unit</TableHead>
+                  <TableHead className="text-right font-serif text-primary font-bold">Total Cost</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {ingredients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       No ingredients yet. Click "New Ingredient" to add your first one.
                     </TableCell>
@@ -208,9 +224,13 @@ export default function IngredientsPage() {
                           {ingredient.category}
                         </span>
                       </TableCell>
+                      <TableCell className="text-right font-mono text-sm">{parseFloat(ingredient.quantity).toFixed(2)}</TableCell>
                       <TableCell className="font-mono text-sm">{ingredient.unit}</TableCell>
                       <TableCell className="text-right font-mono font-medium">
                         ${parseFloat(ingredient.costPerUnit).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-medium">
+                        ${(parseFloat(ingredient.quantity) * parseFloat(ingredient.costPerUnit)).toFixed(2)}
                       </TableCell>
                       <TableCell>
                         <Button

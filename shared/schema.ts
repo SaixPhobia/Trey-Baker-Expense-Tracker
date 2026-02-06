@@ -7,6 +7,7 @@ import { z } from "zod";
 export const ingredients = pgTable("ingredients", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("0"),
   unit: text("unit").notNull(), // kg, liters, dozen, etc.
   costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(), // Flour, Dairy, Eggs, Sugar, etc.
