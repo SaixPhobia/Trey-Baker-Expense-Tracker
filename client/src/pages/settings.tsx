@@ -5,23 +5,25 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Bell, Shield, Save, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ProfileSettings } from "@shared/schema";
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [location] = useLocation();
   const searchParams = new URLSearchParams(location.split("?")[1] || "");
   const defaultTab = searchParams.get("tab") || "profile";
 
-  const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState({
-    name: "Jean Dupont",
-    email: "jean@treybaker.com",
-    role: "Owner",
-    bakeryName: "Trey Baker",
-    phone: "(555) 123-4567",
+    name: "",
+    email: "",
+    role: "",
+    bakeryName: "",
+    phone: "",
   });
 
   const [notifications, setNotifications] = useState({
@@ -38,20 +40,67 @@ export default function SettingsPage() {
     confirmPassword: "",
   });
 
+  const { data: settings, isLoading } = useQuery<ProfileSettings>({
+    queryKey: ["/api/profile"],
+    queryFn: async () => {
+      const res = await fetch("/api/profile");
+      return res.json();
+    }
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setProfile({
+        name: settings.name,
+        email: settings.email,
+        role: settings.role,
+        bakeryName: settings.bakeryName,
+        phone: settings.phone,
+      });
+      setNotifications({
+        emailExpenses: settings.emailExpenses === "true",
+        emailLowStock: settings.emailLowStock === "true",
+        emailWeeklyReport: settings.emailWeeklyReport === "true",
+        pushApprovals: settings.pushApprovals === "true",
+        pushNewOrders: settings.pushNewOrders === "true",
+      });
+    }
+  }, [settings]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: Record<string, string>) => {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+    }
+  });
+
   const handleSaveProfile = () => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      toast({ title: "Profile Updated", description: "Your profile settings have been saved." });
-    }, 600);
+    updateMutation.mutate(profile, {
+      onSuccess: () => {
+        toast({ title: "Profile Updated", description: "Your profile settings have been saved." });
+      }
+    });
   };
 
   const handleSaveNotifications = () => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      toast({ title: "Notifications Updated", description: "Your notification preferences have been saved." });
-    }, 600);
+    updateMutation.mutate({
+      emailExpenses: notifications.emailExpenses.toString(),
+      emailLowStock: notifications.emailLowStock.toString(),
+      emailWeeklyReport: notifications.emailWeeklyReport.toString(),
+      pushApprovals: notifications.pushApprovals.toString(),
+      pushNewOrders: notifications.pushNewOrders.toString(),
+    }, {
+      onSuccess: () => {
+        toast({ title: "Notifications Updated", description: "Your notification preferences have been saved." });
+      }
+    });
   };
 
   const handleChangePassword = () => {
@@ -63,13 +112,19 @@ export default function SettingsPage() {
       toast({ title: "Passwords Don't Match", description: "New password and confirmation must match.", variant: "destructive" });
       return;
     }
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      setSecurity({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      toast({ title: "Password Changed", description: "Your password has been updated successfully." });
-    }, 600);
+    setSecurity({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    toast({ title: "Password Changed", description: "Your password has been updated successfully." });
   };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -92,7 +147,6 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Profile Tab */}
           <TabsContent value="profile" className="mt-6">
             <div className="bg-card border border-border p-6 space-y-6">
               <div className="flex items-center gap-4 pb-6 border-b border-border">
@@ -163,14 +217,13 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <Button onClick={handleSaveProfile} className="rounded-none gap-2" disabled={saving} data-testid="button-save-profile">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              <Button onClick={handleSaveProfile} className="rounded-none gap-2" disabled={updateMutation.isPending} data-testid="button-save-profile">
+                {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save Profile
               </Button>
             </div>
           </TabsContent>
 
-          {/* Notifications Tab */}
           <TabsContent value="notifications" className="mt-6">
             <div className="bg-card border border-border p-6 space-y-6">
               <div>
@@ -242,14 +295,13 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <Button onClick={handleSaveNotifications} className="rounded-none gap-2" disabled={saving} data-testid="button-save-notifications">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              <Button onClick={handleSaveNotifications} className="rounded-none gap-2" disabled={updateMutation.isPending} data-testid="button-save-notifications">
+                {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save Preferences
               </Button>
             </div>
           </TabsContent>
 
-          {/* Security Tab */}
           <TabsContent value="security" className="mt-6">
             <div className="bg-card border border-border p-6 space-y-6">
               <div>
@@ -293,8 +345,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <Button onClick={handleChangePassword} className="rounded-none gap-2" disabled={saving} data-testid="button-change-password">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+              <Button onClick={handleChangePassword} className="rounded-none gap-2" data-testid="button-change-password">
+                <Shield className="h-4 w-4" />
                 Change Password
               </Button>
             </div>

@@ -4,7 +4,8 @@ import {
   type MenuItem, type InsertMenuItem,
   type Expense, type InsertExpense,
   type ExpenseCategory, type InsertExpenseCategory,
-  users, ingredients, menuItems, expenses, expenseCategories
+  type ProfileSettings, type InsertProfileSettings,
+  users, ingredients, menuItems, expenses, expenseCategories, profileSettings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -40,6 +41,10 @@ export interface IStorage {
   getExpenseCategories(): Promise<ExpenseCategory[]>;
   createExpenseCategory(category: InsertExpenseCategory): Promise<ExpenseCategory>;
   deleteExpenseCategory(id: number): Promise<boolean>;
+
+  // Profile Settings
+  getProfileSettings(): Promise<ProfileSettings>;
+  updateProfileSettings(settings: Partial<InsertProfileSettings>): Promise<ProfileSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -147,6 +152,22 @@ export class DatabaseStorage implements IStorage {
   async deleteExpenseCategory(id: number): Promise<boolean> {
     await db.delete(expenseCategories).where(eq(expenseCategories.id, id));
     return true;
+  }
+
+  // Profile Settings
+  async getProfileSettings(): Promise<ProfileSettings> {
+    const [settings] = await db.select().from(profileSettings);
+    if (!settings) {
+      const [created] = await db.insert(profileSettings).values({}).returning();
+      return created;
+    }
+    return settings;
+  }
+
+  async updateProfileSettings(settings: Partial<InsertProfileSettings>): Promise<ProfileSettings> {
+    const existing = await this.getProfileSettings();
+    const [updated] = await db.update(profileSettings).set(settings).where(eq(profileSettings.id, existing.id)).returning();
+    return updated;
   }
 }
 

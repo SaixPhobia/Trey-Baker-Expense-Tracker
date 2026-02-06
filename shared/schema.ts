@@ -54,6 +54,25 @@ export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true,
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
 
+// Profile settings table
+export const profileSettings = pgTable("profile_settings", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().default("Jean Dupont"),
+  email: text("email").notNull().default("jean@treybaker.com"),
+  role: text("role").notNull().default("Owner"),
+  bakeryName: text("bakery_name").notNull().default("Trey Baker"),
+  phone: text("phone").notNull().default("(555) 123-4567"),
+  emailExpenses: text("email_expenses").notNull().default("true"),
+  emailLowStock: text("email_low_stock").notNull().default("true"),
+  emailWeeklyReport: text("email_weekly_report").notNull().default("false"),
+  pushApprovals: text("push_approvals").notNull().default("true"),
+  pushNewOrders: text("push_new_orders").notNull().default("false"),
+});
+
+export const insertProfileSettingsSchema = createInsertSchema(profileSettings).omit({ id: true });
+export type InsertProfileSettings = z.infer<typeof insertProfileSettingsSchema>;
+export type ProfileSettings = typeof profileSettings.$inferSelect;
+
 // Users table (kept for future auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

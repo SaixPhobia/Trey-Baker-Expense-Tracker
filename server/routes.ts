@@ -119,6 +119,17 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // ============ PROFILE SETTINGS ============
+  app.get("/api/profile", async (req, res) => {
+    const settings = await storage.getProfileSettings();
+    res.json(settings);
+  });
+
+  app.patch("/api/profile", async (req, res) => {
+    const updated = await storage.updateProfileSettings(req.body);
+    res.json(updated);
+  });
+
   // ============ CSV EXPORT ============
   app.get("/api/expenses/export", async (req, res) => {
     const expenses = await storage.getExpenses();

@@ -9,9 +9,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useQuery } from "@tanstack/react-query";
+import type { ProfileSettings } from "@shared/schema";
 
 export function Sidebar() {
   const [location, setLocation] = useLocation();
+
+  const { data: profile } = useQuery<ProfileSettings>({
+    queryKey: ["/api/profile"],
+    queryFn: async () => {
+      const res = await fetch("/api/profile");
+      return res.json();
+    }
+  });
+
+  const displayName = profile?.name || "Jean Dupont";
+  const initials = displayName.split(" ").map((n: string) => n[0]).join("");
 
   const links = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -50,9 +63,9 @@ export function Sidebar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <div className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-muted/50 transition-colors group">
-              <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-primary font-bold text-xs">JD</div>
+              <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-primary font-bold text-xs">{initials}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate">Jean Dupont</p>
+                <p className="text-xs font-medium truncate">{displayName}</p>
                 <p className="text-[10px] text-muted-foreground truncate">Settings</p>
               </div>
               <Settings className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
