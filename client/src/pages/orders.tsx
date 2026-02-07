@@ -26,7 +26,9 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -48,6 +50,7 @@ export default function OrdersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [newOrder, setNewOrder] = useState({
     itemName: "",
     quantity: "1",
@@ -291,7 +294,7 @@ export default function OrdersPage() {
                   </TableRow>
                 ) : (
                   orders.map((order) => (
-                    <TableRow key={order.id} className="hover:bg-muted/20 transition-colors duration-200" data-testid={`row-order-${order.id}`}>
+                    <TableRow key={order.id} className="hover:bg-muted/20 transition-colors duration-200 cursor-pointer" data-testid={`row-order-${order.id}`} onClick={() => setSelectedOrder(order)}>
                       <TableCell className="font-mono text-xs text-muted-foreground">#{order.id}</TableCell>
                       <TableCell className="font-mono text-sm">{new Date(order.date).toLocaleDateString()}</TableCell>
                       <TableCell className="font-medium text-sm">{order.submittedBy || <span className="text-muted-foreground italic">—</span>}</TableCell>
@@ -319,7 +322,7 @@ export default function OrdersPage() {
                           {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         {canUpdateStatus || canDelete ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -359,6 +362,133 @@ export default function OrdersPage() {
             </Table>
           </div>
         </div>
+
+        <Dialog open={!!selectedOrder} onOpenChange={(open) => { if (!open) setSelectedOrder(null); }}>
+          <DialogContent className="rounded-none sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="font-serif flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                Order #{selectedOrder?.id}
+              </DialogTitle>
+              <DialogDescription className="sr-only">Order details</DialogDescription>
+            </DialogHeader>
+            {selectedOrder && (
+              <div className="space-y-4" data-testid={`dialog-order-detail-${selectedOrder.id}`}>
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className={cn(
+                    "rounded-none border-none font-normal px-3 py-1 text-xs uppercase tracking-wider",
+                    selectedOrder.status === "Completed" ? "bg-emerald-50 text-emerald-700" :
+                    selectedOrder.status === "In Progress" ? "bg-blue-50 text-blue-700" :
+                    selectedOrder.status === "Cancelled" ? "bg-red-50 text-red-700" :
+                    "bg-amber-50 text-amber-700"
+                  )}>
+                    {selectedOrder.status === "Completed" ? <CheckCircle2 className="mr-1 h-3 w-3 inline" /> : <Clock className="mr-1 h-3 w-3 inline" />}
+                    {selectedOrder.status}
+                  </Badge>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {new Date(selectedOrder.date).toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })}
+                  </span>
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Item</p>
+                    <p className="font-medium" data-testid="text-order-detail-item">{selectedOrder.itemName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Quantity</p>
+                    <p className="font-mono font-medium" data-testid="text-order-detail-qty">{parseFloat(selectedOrder.quantity).toFixed(0)}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Submitted By</p>
+                  <p className="font-medium" data-testid="text-order-detail-submitted-by">{selectedOrder.submittedBy || "—"}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Notes</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap" data-testid="text-order-detail-notes">
+                    {selectedOrder.notes || "No notes provided."}
+                  </p>
+                </div>
+
+                {canUpdateStatus && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Update Status</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedOrder.status === "Pending" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-none text-xs gap-1"
+                            data-testid="button-detail-in-progress"
+                            onClick={() => {
+                              updateMutation.mutate({ id: selectedOrder.id, status: "In Progress" });
+                              setSelectedOrder({ ...selectedOrder, status: "In Progress" });
+                            }}
+                          >
+                            <Clock className="h-3 w-3" /> In Progress
+                          </Button>
+                        )}
+                        {(selectedOrder.status === "Pending" || selectedOrder.status === "In Progress") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-none text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                            data-testid="button-detail-completed"
+                            onClick={() => {
+                              updateMutation.mutate({ id: selectedOrder.id, status: "Completed" });
+                              setSelectedOrder({ ...selectedOrder, status: "Completed" });
+                            }}
+                          >
+                            <CheckCircle2 className="h-3 w-3" /> Completed
+                          </Button>
+                        )}
+                        {selectedOrder.status !== "Cancelled" && selectedOrder.status !== "Completed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-none text-xs gap-1 text-red-600 border-red-200 hover:bg-red-50"
+                            data-testid="button-detail-cancel"
+                            onClick={() => {
+                              updateMutation.mutate({ id: selectedOrder.id, status: "Cancelled" });
+                              setSelectedOrder({ ...selectedOrder, status: "Cancelled" });
+                            }}
+                          >
+                            Cancel Order
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {canDelete && (
+                  <>
+                    <Separator />
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="rounded-none text-xs gap-1 w-full"
+                      data-testid="button-detail-delete"
+                      onClick={() => {
+                        deleteMutation.mutate(selectedOrder.id);
+                        setSelectedOrder(null);
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" /> Delete Order
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
