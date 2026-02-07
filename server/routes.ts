@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertIngredientSchema, insertMenuItemSchema, insertExpenseSchema, insertExpenseCategorySchema } from "@shared/schema";
+import { insertIngredientSchema, insertMenuItemSchema, insertExpenseSchema, insertExpenseCategorySchema, insertOrderSchema } from "@shared/schema";
 import { requireAuth, requireRole } from "./auth";
 
 function getParamId(req: Request): number {
@@ -121,6 +121,36 @@ export async function registerRoutes(
   app.delete("/api/expense-categories/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
     const id = getParamId(req);
     await storage.deleteExpenseCategory(id);
+    res.status(204).send();
+  });
+
+  // ============ ORDERS ============
+  app.get("/api/orders", requireAuth, async (req, res) => {
+    const orders = await storage.getOrders();
+    res.json(orders);
+  });
+
+  app.post("/api/orders", requireAuth, async (req, res) => {
+    const parsed = insertOrderSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.message });
+    }
+    const order = await storage.createOrder(parsed.data);
+    res.status(201).json(order);
+  });
+
+  app.patch("/api/orders/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
+    const updated = await storage.updateOrder(id, req.body);
+    if (!updated) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    res.json(updated);
+  });
+
+  app.delete("/api/orders/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
+    await storage.deleteOrder(id);
     res.status(204).send();
   });
 

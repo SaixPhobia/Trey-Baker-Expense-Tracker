@@ -15,6 +15,7 @@ import SettingsPage from "@/pages/settings";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import TeamPage from "@/pages/team";
+import OrdersPage from "@/pages/orders";
 
 function ProtectedRoutes() {
   const { user, isLoading } = useAuth();
@@ -43,6 +44,7 @@ function ProtectedRoutes() {
       <Route path="/expenses" component={ExpensesPage} />
       <Route path="/ingredients" component={IngredientsPage} />
       <Route path="/menu-items" component={MenuItemsPage} />
+      <Route path="/orders" component={OrdersPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/team" component={TeamPage} />

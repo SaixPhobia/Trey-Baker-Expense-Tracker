@@ -53,6 +53,20 @@ export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true,
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
 
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  date: timestamp("date").notNull().defaultNow(),
+  itemName: text("item_name").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
+  notes: text("notes").notNull().default(""),
+  status: text("status").notNull().default("Pending"),
+  submittedBy: text("submitted_by").notNull().default(""),
+});
+
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, date: true });
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type Order = typeof orders.$inferSelect;
+
 export const profileSettings = pgTable("profile_settings", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().default("Jean Dupont"),

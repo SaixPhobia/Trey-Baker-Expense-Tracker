@@ -4,6 +4,7 @@
 A business management tool for "Trey Baker" bakery that automates expense reporting, price calculations, ingredient inventory, and menu management. Includes role-based user accounts.
 
 ## Recent Changes
+- **2026-02-07**: Added Orders feature - all team members can submit, Owner/Manager can delete and update status
 - **2026-02-06**: Added user accounts with role-based access control (Owner, Manager, Staff)
 - **2026-02-06**: First registered user automatically becomes Owner
 - **2026-02-06**: Added login/register pages, session-based auth, team management page
@@ -21,7 +22,7 @@ A business management tool for "Trey Baker" bakery that automates expense report
 - **Roles**: Owner (full access), Manager (add/delete items), Staff (view + submit expenses)
 
 ### Key Files
-- `shared/schema.ts` - Database schema (users, ingredients, menuItems, expenses, profileSettings, sessions)
+- `shared/schema.ts` - Database schema (users, ingredients, menuItems, expenses, orders, profileSettings, sessions)
 - `server/auth.ts` - Auth middleware (setupAuth, requireAuth, requireRole)
 - `server/routes.ts` - API routes with role-based protection
 - `server/storage.ts` - Database storage interface
@@ -32,4 +33,4 @@ A business management tool for "Trey Baker" bakery that automates expense report
 ### Role Permissions
 - **Owner**: Full access - manage team, settings, add/delete everything
 - **Manager**: Can add/delete ingredients, menu items, expenses
-- **Staff**: Can view everything, submit expenses only (no add/delete ingredients or menu items)
+- **Staff**: Can view everything, submit expenses and orders only (no add/delete ingredients or menu items)

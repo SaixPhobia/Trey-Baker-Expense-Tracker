@@ -5,7 +5,8 @@ import {
   type Expense, type InsertExpense,
   type ExpenseCategory, type InsertExpenseCategory,
   type ProfileSettings, type InsertProfileSettings,
-  users, ingredients, menuItems, expenses, expenseCategories, profileSettings
+  type Order, type InsertOrder,
+  users, ingredients, menuItems, expenses, expenseCategories, profileSettings, orders
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -40,6 +41,12 @@ export interface IStorage {
   getExpenseCategories(): Promise<ExpenseCategory[]>;
   createExpenseCategory(category: InsertExpenseCategory): Promise<ExpenseCategory>;
   deleteExpenseCategory(id: number): Promise<boolean>;
+
+  getOrders(): Promise<Order[]>;
+  getOrder(id: number): Promise<Order | undefined>;
+  createOrder(order: InsertOrder): Promise<Order>;
+  updateOrder(id: number, order: Partial<InsertOrder>): Promise<Order | undefined>;
+  deleteOrder(id: number): Promise<boolean>;
 
   getProfileSettings(): Promise<ProfileSettings>;
   updateProfileSettings(settings: Partial<InsertProfileSettings>): Promise<ProfileSettings>;
@@ -172,6 +179,30 @@ export class DatabaseStorage implements IStorage {
 
   async deleteExpenseCategory(id: number): Promise<boolean> {
     await db.delete(expenseCategories).where(eq(expenseCategories.id, id));
+    return true;
+  }
+
+  async getOrders(): Promise<Order[]> {
+    return db.select().from(orders).orderBy(desc(orders.date));
+  }
+
+  async getOrder(id: number): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    return order;
+  }
+
+  async createOrder(order: InsertOrder): Promise<Order> {
+    const [created] = await db.insert(orders).values(order).returning();
+    return created;
+  }
+
+  async updateOrder(id: number, order: Partial<InsertOrder>): Promise<Order | undefined> {
+    const [updated] = await db.update(orders).set(order).where(eq(orders.id, id)).returning();
+    return updated;
+  }
+
+  async deleteOrder(id: number): Promise<boolean> {
+    await db.delete(orders).where(eq(orders.id, id));
     return true;
   }
 
