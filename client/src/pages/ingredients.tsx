@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Loader2, Package } from "lucide-react";
+import { Plus, Trash2, Loader2, Package, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -41,6 +41,8 @@ export default function IngredientsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", quantity: "", unit: "kg", costPerUnit: "", category: "Flour" });
   const [newIngredient, setNewIngredient] = useState({
     name: "",
     quantity: "",
@@ -75,6 +77,23 @@ export default function IngredientsPage() {
     }
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; name: string; quantity: string; unit: string; costPerUnit: string; category: string }) => {
+      const res = await fetch(`/api/ingredients/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Failed to update ingredient");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
+      setEditingIngredient(null);
+      toast({ title: "Ingredient Updated", description: "Changes have been saved." });
+    }
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       await fetch(`/api/ingredients/${id}`, { method: "DELETE" });
@@ -84,6 +103,22 @@ export default function IngredientsPage() {
       toast({ title: "Ingredient Deleted", description: "Ingredient has been removed.", variant: "destructive" });
     }
   });
+
+  const handleEditIngredient = (ingredient: Ingredient) => {
+    setEditForm({
+      name: ingredient.name,
+      quantity: parseFloat(ingredient.quantity).toString(),
+      unit: ingredient.unit,
+      costPerUnit: parseFloat(ingredient.costPerUnit).toString(),
+      category: ingredient.category,
+    });
+    setEditingIngredient(ingredient);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingIngredient || !editForm.name || !editForm.quantity || !editForm.costPerUnit) return;
+    updateMutation.mutate({ id: editingIngredient.id, ...editForm });
+  };
 
   const handleAddIngredient = () => {
     if (!newIngredient.name || !newIngredient.costPerUnit || !newIngredient.quantity) return;
@@ -238,15 +273,26 @@ export default function IngredientsPage() {
                       </TableCell>
                       {canManage && (
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => deleteMutation.mutate(ingredient.id)}
-                            data-testid={`button-delete-ingredient-${ingredient.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={() => handleEditIngredient(ingredient)}
+                              data-testid={`button-edit-ingredient-${ingredient.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => deleteMutation.mutate(ingredient.id)}
+                              data-testid={`button-delete-ingredient-${ingredient.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
@@ -256,6 +302,96 @@ export default function IngredientsPage() {
             </Table>
           </div>
         )}
+
+        <Dialog open={!!editingIngredient} onOpenChange={(open) => { if (!open) setEditingIngredient(null); }}>
+          <DialogContent className="rounded-none sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="font-serif">Edit Ingredient</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">Name</Label>
+                <Input
+                  id="edit-name"
+                  data-testid="input-edit-ingredient-name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="rounded-none border-muted"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-quantity">Quantity</Label>
+                  <Input
+                    id="edit-quantity"
+                    type="number"
+                    step="0.01"
+                    data-testid="input-edit-ingredient-quantity"
+                    value={editForm.quantity}
+                    onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                    className="rounded-none border-muted"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-costPerUnit">Cost per Unit ($)</Label>
+                  <Input
+                    id="edit-costPerUnit"
+                    type="number"
+                    step="0.01"
+                    data-testid="input-edit-ingredient-cost"
+                    value={editForm.costPerUnit}
+                    onChange={(e) => setEditForm({ ...editForm, costPerUnit: e.target.value })}
+                    className="rounded-none border-muted"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Unit</Label>
+                  <Select
+                    value={editForm.unit}
+                    onValueChange={(value) => setEditForm({ ...editForm, unit: value })}
+                  >
+                    <SelectTrigger className="rounded-none border-muted">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none">
+                      {UNITS.map(unit => (
+                        <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Category</Label>
+                <Select
+                  value={editForm.category}
+                  onValueChange={(value) => setEditForm({ ...editForm, category: value })}
+                >
+                  <SelectTrigger className="rounded-none border-muted">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-none">
+                    {INGREDIENT_CATEGORIES.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="bg-muted/30 border border-border p-3">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Cost Preview</p>
+                <p className="text-lg font-mono font-bold text-primary" data-testid="text-edit-total-cost">
+                  ${((parseFloat(editForm.quantity) || 0) * (parseFloat(editForm.costPerUnit) || 0)).toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleSaveEdit} className="rounded-none w-full" disabled={updateMutation.isPending} data-testid="button-save-ingredient">
+                {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
