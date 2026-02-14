@@ -193,6 +193,18 @@ export async function registerRoutes(
     });
   });
 
+  app.delete("/api/team/:id", requireAuth, requireRole("Owner"), async (req, res) => {
+    const targetId = req.params.id as string;
+    if (targetId === (req.session as any).userId) {
+      return res.status(400).json({ error: "Cannot remove yourself" });
+    }
+    const deleted = await storage.deleteUser(targetId);
+    if (!deleted) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.status(204).end();
+  });
+
   // ============ CSV EXPORT ============
   app.get("/api/expenses/export", requireAuth, async (req, res) => {
     const expenses = await storage.getExpenses();

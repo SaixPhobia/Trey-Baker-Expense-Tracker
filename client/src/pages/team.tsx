@@ -1,6 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, Shield, ShieldCheck, User } from "lucide-react";
+import { Loader2, Users, Shield, ShieldCheck, User, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -73,6 +73,23 @@ export default function TeamPage() {
     },
   });
 
+  const deleteMemberMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/team/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to remove member");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/team"] });
+      toast({ title: "Member Removed", description: "Team member has been removed." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   if (user?.role !== "Owner") {
     return (
       <Layout>
@@ -133,12 +150,13 @@ export default function TeamPage() {
                   <TableHead className="font-serif text-primary font-bold">Username</TableHead>
                   <TableHead className="font-serif text-primary font-bold">Role</TableHead>
                   <TableHead className="font-serif text-primary font-bold w-[200px]">Change Role</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {members.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       No team members yet.
                     </TableCell>
@@ -182,6 +200,19 @@ export default function TeamPage() {
                                 <SelectItem value="Staff">Staff</SelectItem>
                               </SelectContent>
                             </Select>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {!isSelf && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => deleteMemberMutation.mutate(member.id)}
+                              data-testid={`button-remove-member-${member.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
