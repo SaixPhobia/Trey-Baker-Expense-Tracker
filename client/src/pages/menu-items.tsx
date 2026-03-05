@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Loader2, CakeSlice } from "lucide-react";
+import { Plus, Trash2, Loader2, CakeSlice, Package, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -23,10 +23,216 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import type { MenuItem } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
+import type { MenuItem, Ingredient, MenuItemIngredient } from "@shared/schema";
 import { useAuth } from "@/lib/auth";
 
 const MENU_CATEGORIES = ["Food", "Drinks", "Seasonal Food", "Seasonal Drinks"];
+
+function IngredientsDialog({ menuItem, canManage }: { menuItem: MenuItem; canManage: boolean }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState("");
+  const [qty, setQty] = useState("");
+  const [localItems, setLocalItems] = useState<{ ingredientId: number; quantityNeeded: string; ingredientName?: string; unit?: string }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const { data: allIngredients = [] } = useQuery<Ingredient[]>({
+    queryKey: ["/api/ingredients"],
+    queryFn: async () => {
+      const res = await fetch("/api/ingredients");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  const { data: linkedIngredients = [], isLoading } = useQuery<MenuItemIngredient[]>({
+    queryKey: [`/api/menu-items/${menuItem.id}/ingredients`],
+    queryFn: async () => {
+      const res = await fetch(`/api/menu-items/${menuItem.id}/ingredients`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (items: { ingredientId: number; quantityNeeded: string }[]) => {
+      const res = await fetch(`/api/menu-items/${menuItem.id}/ingredients`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(items),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/menu-items/${menuItem.id}/ingredients`] });
+      toast({ title: "Ingredients Saved", description: `Updated ingredients for ${menuItem.name}.` });
+    },
+  });
+
+  useEffect(() => {
+    if (!loaded && linkedIngredients.length > 0 && allIngredients.length > 0) {
+      setLocalItems(linkedIngredients.map(li => {
+        const ing = allIngredients.find(i => i.id === li.ingredientId);
+        return {
+          ingredientId: li.ingredientId,
+          quantityNeeded: li.quantityNeeded,
+          ingredientName: ing?.name,
+          unit: ing?.unit,
+        };
+      }));
+      setLoaded(true);
+    }
+  }, [loaded, linkedIngredients, allIngredients]);
+
+  const handleOpen = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      setLoaded(false);
+      setLocalItems([]);
+      setSelectedIngredient("");
+      setQty("");
+    }
+  };
+
+  const addIngredient = () => {
+    if (!selectedIngredient || !qty) return;
+    const ingId = parseInt(selectedIngredient);
+    if (localItems.some(i => i.ingredientId === ingId)) {
+      toast({ title: "Already Added", description: "This ingredient is already in the list.", variant: "destructive" });
+      return;
+    }
+    const ing = allIngredients.find(i => i.id === ingId);
+    setLocalItems([...localItems, { ingredientId: ingId, quantityNeeded: qty, ingredientName: ing?.name, unit: ing?.unit }]);
+    setSelectedIngredient("");
+    setQty("");
+  };
+
+  const removeIngredient = (ingredientId: number) => {
+    setLocalItems(localItems.filter(i => i.ingredientId !== ingredientId));
+  };
+
+  const handleSave = () => {
+    saveMutation.mutate(localItems.map(i => ({ ingredientId: i.ingredientId, quantityNeeded: i.quantityNeeded })));
+  };
+
+  const ingredientCost = localItems.reduce((sum, li) => {
+    const ing = allIngredients.find(i => i.id === li.ingredientId);
+    if (!ing) return sum;
+    return sum + parseFloat(li.quantityNeeded) * parseFloat(ing.costPerUnit);
+  }, 0);
+
+  const availableIngredients = allIngredients.filter(i => !localItems.some(li => li.ingredientId === i.id));
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary" data-testid={`button-ingredients-${menuItem.id}`}>
+          <Package className="h-4 w-4 mr-1" /> Ingredients
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="rounded-none sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="font-serif">Ingredients for {menuItem.name}</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {localItems.length > 0 && (
+              <div className="space-y-2">
+                {localItems.map((item) => {
+                  const ing = allIngredients.find(i => i.id === item.ingredientId);
+                  const cost = ing ? parseFloat(item.quantityNeeded) * parseFloat(ing.costPerUnit) : 0;
+                  return (
+                    <div key={item.ingredientId} className="flex items-center justify-between p-3 bg-muted/30 border border-border" data-testid={`ingredient-row-${item.ingredientId}`}>
+                      <div className="flex-1">
+                        <span className="font-medium text-sm">{item.ingredientName || `Ingredient #${item.ingredientId}`}</span>
+                        <span className="text-muted-foreground text-sm ml-2">
+                          {item.quantityNeeded} {item.unit || ""}
+                        </span>
+                      </div>
+                      <span className="font-mono text-sm text-primary mr-3">${cost.toFixed(2)}</span>
+                      {canManage && (
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => removeIngredient(item.ingredientId)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+                <div className="flex justify-between pt-2 border-t border-border">
+                  <span className="text-sm font-medium">Ingredient Cost</span>
+                  <span className="font-mono text-sm font-bold text-primary">${ingredientCost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium">Sale Price</span>
+                  <span className="font-mono text-sm">${parseFloat(menuItem.basePrice).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium">Margin</span>
+                  <span className={`font-mono text-sm font-bold ${parseFloat(menuItem.basePrice) - ingredientCost > 0 ? 'text-green-600' : 'text-destructive'}`}>
+                    ${(parseFloat(menuItem.basePrice) - ingredientCost).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+            {localItems.length === 0 && (
+              <p className="text-center text-muted-foreground text-sm py-4">No ingredients linked yet.</p>
+            )}
+
+            {canManage && (
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Label className="text-xs">Ingredient</Label>
+                  <Select value={selectedIngredient} onValueChange={setSelectedIngredient}>
+                    <SelectTrigger className="rounded-none border-muted text-sm">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none">
+                      {availableIngredients.map(ing => (
+                        <SelectItem key={ing.id} value={String(ing.id)}>{ing.name} ({ing.unit})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-24">
+                  <Label className="text-xs">Qty</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                    placeholder="0.00"
+                    className="rounded-none border-muted text-sm"
+                    data-testid="input-ingredient-qty"
+                  />
+                </div>
+                <Button size="sm" className="rounded-none" onClick={addIngredient} data-testid="button-add-ingredient-to-item">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+        {canManage && (
+          <DialogFooter>
+            <Button onClick={handleSave} className="rounded-none w-full" disabled={saveMutation.isPending} data-testid="button-save-ingredients">
+              {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save Ingredients
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function MenuItemsPage() {
   const { user } = useAuth();
@@ -82,7 +288,6 @@ export default function MenuItemsPage() {
     createMutation.mutate(newItem);
   };
 
-  // Group items by category
   const itemsByCategory = menuItems.reduce((acc, item) => {
     if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
@@ -96,7 +301,7 @@ export default function MenuItemsPage() {
           <div>
             <h1 className="text-3xl font-serif font-bold text-primary mb-2">Menu Items</h1>
             <p className="text-muted-foreground max-w-2xl">
-              Manage your bakery's menu with prices. Use the Price Calculator to determine optimal pricing based on ingredient costs.
+              Manage your bakery's menu with prices. Click "Ingredients" on any item to link ingredients and see cost margins.
             </p>
           </div>
           {canManage && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -202,19 +407,20 @@ export default function MenuItemsPage() {
                           <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
                         </CardContent>
                       )}
-                      {canManage && (
-                        <CardFooter className="pt-2">
+                      <CardFooter className="pt-2 flex justify-between">
+                        <IngredientsDialog menuItem={item} canManage={canManage} />
+                        {canManage && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-destructive hover:text-destructive ml-auto"
+                            className="text-destructive hover:text-destructive"
                             onClick={() => deleteMutation.mutate(item.id)}
                             data-testid={`button-delete-menu-item-${item.id}`}
                           >
                             <Trash2 className="h-4 w-4 mr-1" /> Remove
                           </Button>
-                        </CardFooter>
-                      )}
+                        )}
+                      </CardFooter>
                     </Card>
                   ))}
                 </div>

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, serial, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, serial, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -66,6 +66,45 @@ export const orders = pgTable("orders", {
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, date: true });
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
+
+export const menuItemIngredients = pgTable("menu_item_ingredients", {
+  id: serial("id").primaryKey(),
+  menuItemId: integer("menu_item_id").notNull(),
+  ingredientId: integer("ingredient_id").notNull(),
+  quantityNeeded: decimal("quantity_needed", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertMenuItemIngredientSchema = createInsertSchema(menuItemIngredients).omit({ id: true });
+export type InsertMenuItemIngredient = z.infer<typeof insertMenuItemIngredientSchema>;
+export type MenuItemIngredient = typeof menuItemIngredients.$inferSelect;
+
+export const receipts = pgTable("receipts", {
+  id: serial("id").primaryKey(),
+  date: timestamp("date").notNull().defaultNow(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
+  tax: decimal("tax", { precision: 10, scale: 2 }).notNull().default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0"),
+  createdBy: text("created_by").notNull().default(""),
+  status: text("status").notNull().default("Completed"),
+});
+
+export const insertReceiptSchema = createInsertSchema(receipts).omit({ id: true, date: true });
+export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
+export type Receipt = typeof receipts.$inferSelect;
+
+export const receiptItems = pgTable("receipt_items", {
+  id: serial("id").primaryKey(),
+  receiptId: integer("receipt_id").notNull(),
+  menuItemId: integer("menu_item_id"),
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertReceiptItemSchema = createInsertSchema(receiptItems).omit({ id: true });
+export type InsertReceiptItem = z.infer<typeof insertReceiptItemSchema>;
+export type ReceiptItem = typeof receiptItems.$inferSelect;
 
 export const profileSettings = pgTable("profile_settings", {
   id: serial("id").primaryKey(),

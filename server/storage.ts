@@ -6,7 +6,11 @@ import {
   type ExpenseCategory, type InsertExpenseCategory,
   type ProfileSettings, type InsertProfileSettings,
   type Order, type InsertOrder,
-  users, ingredients, menuItems, expenses, expenseCategories, profileSettings, orders
+  type MenuItemIngredient, type InsertMenuItemIngredient,
+  type Receipt, type InsertReceipt,
+  type ReceiptItem, type InsertReceiptItem,
+  users, ingredients, menuItems, expenses, expenseCategories, profileSettings, orders,
+  menuItemIngredients, receipts, receiptItems
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -48,6 +52,15 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: number, order: Partial<InsertOrder>): Promise<Order | undefined>;
   deleteOrder(id: number): Promise<boolean>;
+
+  getMenuItemIngredients(menuItemId: number): Promise<MenuItemIngredient[]>;
+  setMenuItemIngredients(menuItemId: number, items: InsertMenuItemIngredient[]): Promise<MenuItemIngredient[]>;
+
+  getReceipts(): Promise<Receipt[]>;
+  getReceipt(id: number): Promise<Receipt | undefined>;
+  createReceipt(receipt: InsertReceipt, items: InsertReceiptItem[]): Promise<Receipt & { items: ReceiptItem[] }>;
+  deleteReceipt(id: number): Promise<boolean>;
+  getReceiptItems(receiptId: number): Promise<ReceiptItem[]>;
 
   getProfileSettings(): Promise<ProfileSettings>;
   updateProfileSettings(settings: Partial<InsertProfileSettings>): Promise<ProfileSettings>;
@@ -210,6 +223,44 @@ export class DatabaseStorage implements IStorage {
   async deleteOrder(id: number): Promise<boolean> {
     await db.delete(orders).where(eq(orders.id, id));
     return true;
+  }
+
+  async getMenuItemIngredients(menuItemId: number): Promise<MenuItemIngredient[]> {
+    return db.select().from(menuItemIngredients).where(eq(menuItemIngredients.menuItemId, menuItemId));
+  }
+
+  async setMenuItemIngredients(menuItemId: number, items: InsertMenuItemIngredient[]): Promise<MenuItemIngredient[]> {
+    await db.delete(menuItemIngredients).where(eq(menuItemIngredients.menuItemId, menuItemId));
+    if (items.length === 0) return [];
+    const created = await db.insert(menuItemIngredients).values(items).returning();
+    return created;
+  }
+
+  async getReceipts(): Promise<Receipt[]> {
+    return db.select().from(receipts).orderBy(desc(receipts.date));
+  }
+
+  async getReceipt(id: number): Promise<Receipt | undefined> {
+    const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id));
+    return receipt;
+  }
+
+  async createReceipt(receipt: InsertReceipt, items: InsertReceiptItem[]): Promise<Receipt & { items: ReceiptItem[] }> {
+    const [created] = await db.insert(receipts).values(receipt).returning();
+    const createdItems = items.length > 0
+      ? await db.insert(receiptItems).values(items.map(i => ({ ...i, receiptId: created.id }))).returning()
+      : [];
+    return { ...created, items: createdItems };
+  }
+
+  async deleteReceipt(id: number): Promise<boolean> {
+    await db.delete(receiptItems).where(eq(receiptItems.receiptId, id));
+    await db.delete(receipts).where(eq(receipts.id, id));
+    return true;
+  }
+
+  async getReceiptItems(receiptId: number): Promise<ReceiptItem[]> {
+    return db.select().from(receiptItems).where(eq(receiptItems.receiptId, receiptId));
   }
 
   async getProfileSettings(): Promise<ProfileSettings> {

@@ -1,7 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertIngredientSchema, insertMenuItemSchema, insertExpenseSchema, insertExpenseCategorySchema, insertOrderSchema } from "@shared/schema";
+import { insertIngredientSchema, insertMenuItemSchema, insertExpenseSchema, insertExpenseCategorySchema, insertOrderSchema, insertMenuItemIngredientSchema } from "@shared/schema";
+import { z } from "zod";
 import { requireAuth, requireRole } from "./auth";
 
 function getParamId(req: Request): number {
@@ -151,6 +152,98 @@ export async function registerRoutes(
   app.delete("/api/orders/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
     const id = getParamId(req);
     await storage.deleteOrder(id);
+    res.status(204).send();
+  });
+
+  // ============ MENU ITEM INGREDIENTS ============
+  app.get("/api/menu-items/:id/ingredients", requireAuth, async (req, res) => {
+    const id = getParamId(req);
+    const items = await storage.getMenuItemIngredients(id);
+    res.json(items);
+  });
+
+  app.put("/api/menu-items/:id/ingredients", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const menuItemId = getParamId(req);
+    const itemsSchema = z.array(z.object({
+      ingredientId: z.number(),
+      quantityNeeded: z.string(),
+    }));
+    const parsed = itemsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.message });
+    }
+    const items = parsed.data.map(i => ({
+      menuItemId,
+      ingredientId: i.ingredientId,
+      quantityNeeded: i.quantityNeeded,
+    }));
+    const result = await storage.setMenuItemIngredients(menuItemId, items);
+    res.json(result);
+  });
+
+  // ============ RECEIPTS ============
+  app.get("/api/receipts", requireAuth, async (req, res) => {
+    const allReceipts = await storage.getReceipts();
+    res.json(allReceipts);
+  });
+
+  app.get("/api/receipts/:id", requireAuth, async (req, res) => {
+    const id = getParamId(req);
+    const receipt = await storage.getReceipt(id);
+    if (!receipt) {
+      return res.status(404).json({ error: "Receipt not found" });
+    }
+    const items = await storage.getReceiptItems(id);
+    res.json({ ...receipt, items });
+  });
+
+  app.post("/api/receipts", requireAuth, async (req, res) => {
+    const bodySchema = z.object({
+      items: z.array(z.object({
+        menuItemId: z.number().nullable().optional(),
+        itemName: z.string(),
+        quantity: z.number().min(1),
+        unitPrice: z.string(),
+      })),
+    });
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.message });
+    }
+
+    const userId = (req.session as any).userId;
+    const sessionUser = await storage.getUser(userId);
+    const createdBy = sessionUser?.displayName || sessionUser?.username || "Staff";
+
+    const TAX_RATE = 0.08;
+    const serverItems = parsed.data.items.map(i => {
+      const lineTotal = (parseFloat(i.unitPrice) * i.quantity).toFixed(2);
+      return {
+        menuItemId: i.menuItemId ?? null,
+        itemName: i.itemName,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        lineTotal,
+        receiptId: 0,
+      };
+    });
+    const subtotal = serverItems.reduce((s, i) => s + parseFloat(i.lineTotal), 0);
+    const tax = subtotal * TAX_RATE;
+    const total = subtotal + tax;
+
+    const receipt = await storage.createReceipt({
+      subtotal: subtotal.toFixed(2),
+      tax: tax.toFixed(2),
+      total: total.toFixed(2),
+      createdBy,
+      status: "Completed",
+    }, serverItems);
+    res.status(201).json(receipt);
+  });
+
+  app.delete("/api/receipts/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
+    await storage.deleteReceipt(id);
     res.status(204).send();
   });
 
