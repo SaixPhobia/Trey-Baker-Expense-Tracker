@@ -33,8 +33,6 @@ import { Badge } from "@/components/ui/badge";
 import type { MenuItem, Receipt, ReceiptItem } from "@shared/schema";
 import { useAuth } from "@/lib/auth";
 
-const TAX_RATE = 0.08;
-
 interface CartItem {
   menuItemId: number | null;
   itemName: string;
@@ -109,15 +107,7 @@ function ReceiptViewDialog({ receipt, onClose }: { receipt: (Receipt & { items?:
           </div>
           <div style={{ borderTop: "1px dashed #ccc", margin: "12px 0" }} />
           <div className="space-y-1">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span className="font-mono">${parseFloat(receipt.subtotal).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Tax</span>
-              <span className="font-mono">${parseFloat(receipt.tax).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-bold text-base pt-1 border-t border-dashed border-border">
+            <div className="flex justify-between font-bold text-base">
               <span>Total</span>
               <span className="font-mono">${parseFloat(receipt.total).toFixed(2)}</span>
             </div>
@@ -240,8 +230,7 @@ export default function ReceiptsPage() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.lineTotal, 0);
-  const tax = subtotal * TAX_RATE;
-  const total = subtotal + tax;
+  const total = subtotal;
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
@@ -407,15 +396,7 @@ export default function ReceiptsPage() {
                     </TableBody>
                   </Table>
                   <div className="p-4 bg-muted/10 border-t border-border space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Subtotal</span>
-                      <span className="font-mono" data-testid="text-subtotal">${subtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>Tax ({(TAX_RATE * 100).toFixed(0)}%)</span>
-                      <span className="font-mono" data-testid="text-tax">${tax.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-dashed border-border">
+                    <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
                       <span className="font-mono text-primary" data-testid="text-total">${total.toFixed(2)}</span>
                     </div>

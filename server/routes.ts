@@ -215,7 +215,6 @@ export async function registerRoutes(
     const sessionUser = await storage.getUser(userId);
     const createdBy = sessionUser?.displayName || sessionUser?.username || "Staff";
 
-    const TAX_RATE = 0.08;
     const serverItems = parsed.data.items.map(i => {
       const lineTotal = (parseFloat(i.unitPrice) * i.quantity).toFixed(2);
       return {
@@ -228,12 +227,11 @@ export async function registerRoutes(
       };
     });
     const subtotal = serverItems.reduce((s, i) => s + parseFloat(i.lineTotal), 0);
-    const tax = subtotal * TAX_RATE;
-    const total = subtotal + tax;
+    const total = subtotal;
 
     const receipt = await storage.createReceipt({
       subtotal: subtotal.toFixed(2),
-      tax: tax.toFixed(2),
+      tax: "0.00",
       total: total.toFixed(2),
       createdBy,
       status: "Completed",
