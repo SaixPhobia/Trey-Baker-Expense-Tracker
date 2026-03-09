@@ -26,6 +26,10 @@ export default function LoginPage() {
   const [forgotUsername, setForgotUsername] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [recoveredPassword, setRecoveredPassword] = useState<string | null>(null);
+  const [showReset, setShowReset] = useState(false);
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +71,29 @@ export default function LoginPage() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!forgotUsername || !resetNewPassword) return;
+    setResetLoading(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: forgotUsername, newPassword: resetNewPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Error", description: data.error, variant: "destructive" });
+      } else {
+        setResetDone(true);
+        toast({ title: "Password Reset", description: "Your password has been updated. You can now log in." });
+      }
+    } catch {
+      toast({ title: "Error", description: "Something went wrong.", variant: "destructive" });
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md rounded-none border-border shadow-lg">
@@ -99,7 +126,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   className="text-xs text-primary hover:underline"
-                  onClick={() => { setForgotOpen(true); setForgotUsername(""); setRecoveredPassword(null); }}
+                  onClick={() => { setForgotOpen(true); setForgotUsername(""); setRecoveredPassword(null); setShowReset(false); setResetNewPassword(""); setResetDone(false); }}
                   data-testid="link-forgot-password"
                 >
                   Forgot password?
@@ -138,11 +165,11 @@ export default function LoginPage() {
       <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
         <DialogContent className="rounded-none sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle className="font-serif">Forgot Password</DialogTitle>
+            <DialogTitle className="font-serif">{showReset ? "Reset Password" : "Forgot Password"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Enter your username to recover your password.
+              {showReset ? "Enter your username and choose a new password." : "Enter your username to recover or reset your password."}
             </p>
             <div className="grid gap-2">
               <Label htmlFor="forgot-username">Username</Label>
@@ -155,32 +182,79 @@ export default function LoginPage() {
                 data-testid="input-forgot-username"
               />
             </div>
+            {showReset && !resetDone && (
+              <div className="grid gap-2">
+                <Label htmlFor="reset-new-password">New Password</Label>
+                <Input
+                  id="reset-new-password"
+                  type="password"
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 4 characters)"
+                  className="rounded-none border-muted"
+                  data-testid="input-reset-new-password"
+                />
+              </div>
+            )}
             {recoveredPassword && (
               <div className="p-4 bg-muted/30 border border-border space-y-1">
                 <p className="text-xs text-muted-foreground">Your password is:</p>
                 <p className="font-mono text-lg font-bold text-primary" data-testid="text-recovered-password">{recoveredPassword}</p>
               </div>
             )}
+            {resetDone && (
+              <div className="p-4 bg-green-50 border border-green-200 text-green-700 text-sm">
+                Password has been reset successfully. You can now log in with your new password.
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            {recoveredPassword ? (
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            {resetDone ? (
               <Button
-                onClick={() => { setForgotOpen(false); setPassword(""); setUsername(forgotUsername); }}
+                onClick={() => { setForgotOpen(false); setUsername(forgotUsername); setPassword(""); }}
                 className="rounded-none w-full"
                 data-testid="button-back-to-login"
               >
                 Back to Login
               </Button>
-            ) : (
+            ) : recoveredPassword ? (
               <Button
-                onClick={handleForgotPassword}
+                onClick={() => { setForgotOpen(false); setUsername(forgotUsername); setPassword(""); }}
                 className="rounded-none w-full"
-                disabled={!forgotUsername || forgotLoading}
-                data-testid="button-recover-password"
+                data-testid="button-back-to-login"
               >
-                {forgotLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Recover Password
+                Back to Login
               </Button>
+            ) : showReset ? (
+              <Button
+                onClick={handleResetPassword}
+                className="rounded-none w-full"
+                disabled={!forgotUsername || resetNewPassword.length < 4 || resetLoading}
+                data-testid="button-confirm-reset"
+              >
+                {resetLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Set New Password
+              </Button>
+            ) : (
+              <>
+                <Button
+                  onClick={handleForgotPassword}
+                  className="rounded-none w-full"
+                  disabled={!forgotUsername || forgotLoading}
+                  data-testid="button-recover-password"
+                >
+                  {forgotLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Recover Password
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowReset(true)}
+                  className="rounded-none w-full"
+                  data-testid="button-reset-password"
+                >
+                  Reset Password Instead
+                </Button>
+              </>
             )}
           </DialogFooter>
         </DialogContent>

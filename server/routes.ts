@@ -321,9 +321,25 @@ export async function registerRoutes(
       return res.status(404).json({ error: "No account found with that username" });
     }
     if (user.password?.startsWith("$2")) {
-      return res.status(400).json({ error: "This account has an encrypted password. Please ask the Owner to reset it for you." });
+      return res.status(400).json({ error: "This account has an encrypted password. Please use the reset option below to set a new one." });
     }
     res.json({ password: user.password });
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    const { username, newPassword } = req.body;
+    if (!username || !newPassword) {
+      return res.status(400).json({ error: "Username and new password are required" });
+    }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ error: "Password must be at least 4 characters" });
+    }
+    const user = await storage.getUserByUsername(username);
+    if (!user) {
+      return res.status(404).json({ error: "No account found with that username" });
+    }
+    await storage.updateUserPassword(user.id, newPassword);
+    res.json({ success: true });
   });
 
   // ============ CSV EXPORT ============
