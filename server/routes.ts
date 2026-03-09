@@ -310,6 +310,22 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // ============ FORGOT PASSWORD ============
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    const { username } = req.body;
+    if (!username) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+    const user = await storage.getUserByUsername(username);
+    if (!user) {
+      return res.status(404).json({ error: "No account found with that username" });
+    }
+    if (user.password?.startsWith("$2")) {
+      return res.status(400).json({ error: "This account has an encrypted password. Please ask the Owner to reset it for you." });
+    }
+    res.json({ password: user.password });
+  });
+
   // ============ CSV EXPORT ============
   app.get("/api/expenses/export", requireAuth, async (req, res) => {
     const expenses = await storage.getExpenses();
