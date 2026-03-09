@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertIngredientSchema, insertMenuItemSchema, insertExpenseSchema, insertExpenseCategorySchema, insertOrderSchema, insertMenuItemIngredientSchema } from "@shared/schema";
 import { z } from "zod";
 import { requireAuth, requireRole } from "./auth";
+import bcrypt from "bcryptjs";
 
 function getParamId(req: Request): number {
   return parseInt(req.params.id as string);
@@ -294,6 +295,19 @@ export async function registerRoutes(
       return res.status(404).json({ error: "User not found" });
     }
     res.status(204).end();
+  });
+
+  app.patch("/api/team/:id/password", requireAuth, requireRole("Owner"), async (req, res) => {
+    const { password } = req.body;
+    if (!password || typeof password !== "string" || password.length < 4) {
+      return res.status(400).json({ error: "Password must be at least 4 characters" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const updated = await storage.updateUserPassword(req.params.id as string, hashedPassword);
+    if (!updated) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json({ success: true });
   });
 
   // ============ CSV EXPORT ============

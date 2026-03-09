@@ -23,6 +23,7 @@ export interface IStorage {
   getUserCount(): Promise<number>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
+  updateUserPassword(id: string, hashedPassword: string): Promise<boolean>;
   getAllUsers(): Promise<User[]>;
   
   getIngredients(): Promise<Ingredient[]>;
@@ -109,6 +110,11 @@ export class DatabaseStorage implements IStorage {
   async deleteUser(id: string): Promise<boolean> {
     const [deleted] = await db.delete(users).where(eq(users.id, id)).returning();
     return !!deleted;
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<boolean> {
+    const [updated] = await db.update(users).set({ password: hashedPassword }).where(eq(users.id, id)).returning();
+    return !!updated;
   }
 
   async getAllUsers(): Promise<User[]> {

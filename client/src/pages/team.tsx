@@ -1,8 +1,11 @@
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, Shield, ShieldCheck, User, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Users, Shield, ShieldCheck, User, Trash2, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Select,
@@ -11,6 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -70,6 +80,32 @@ export default function TeamPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update role.", variant: "destructive" });
+    },
+  });
+
+  const [resetPasswordMember, setResetPasswordMember] = useState<TeamMember | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ id, password }: { id: string; password: string }) => {
+      const res = await fetch(`/api/team/${id}/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to reset password");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setResetPasswordMember(null);
+      setNewPassword("");
+      toast({ title: "Password Reset", description: "The team member's password has been updated." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -203,17 +239,28 @@ export default function TeamPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {!isSelf && (
+                          <div className="flex gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => deleteMemberMutation.mutate(member.id)}
-                              data-testid={`button-remove-member-${member.id}`}
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={() => { setResetPasswordMember(member); setNewPassword(""); }}
+                              data-testid={`button-reset-password-${member.id}`}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <KeyRound className="h-4 w-4" />
                             </Button>
-                          )}
+                            {!isSelf && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => deleteMemberMutation.mutate(member.id)}
+                                data-testid={`button-remove-member-${member.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -224,6 +271,46 @@ export default function TeamPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!resetPasswordMember} onOpenChange={(open) => { if (!open) setResetPasswordMember(null); }}>
+        <DialogContent className="rounded-none sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Reset Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Set a new password for <span className="font-medium text-foreground">{resetPasswordMember?.displayName}</span> (@{resetPasswordMember?.username}).
+            </p>
+            <div className="grid gap-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password (min 4 characters)"
+                className="rounded-none border-muted"
+                data-testid="input-new-password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (resetPasswordMember && newPassword.length >= 4) {
+                  resetPasswordMutation.mutate({ id: resetPasswordMember.id, password: newPassword });
+                }
+              }}
+              className="rounded-none w-full"
+              disabled={newPassword.length < 4 || resetPasswordMutation.isPending}
+              data-testid="button-confirm-reset-password"
+            >
+              {resetPasswordMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Reset Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
