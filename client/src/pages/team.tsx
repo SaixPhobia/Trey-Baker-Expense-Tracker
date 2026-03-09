@@ -37,6 +37,7 @@ interface TeamMember {
   username: string;
   displayName: string;
   role: string;
+  password: string;
 }
 
 const ROLE_ICONS: Record<string, typeof Shield> = {
@@ -100,6 +101,7 @@ export default function TeamPage() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/team"] });
       setResetPasswordMember(null);
       setNewPassword("");
       toast({ title: "Password Reset", description: "The team member's password has been updated." });
@@ -184,6 +186,7 @@ export default function TeamPage() {
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
                   <TableHead className="font-serif text-primary font-bold">Name</TableHead>
                   <TableHead className="font-serif text-primary font-bold">Username</TableHead>
+                  <TableHead className="font-serif text-primary font-bold">Password</TableHead>
                   <TableHead className="font-serif text-primary font-bold">Role</TableHead>
                   <TableHead className="font-serif text-primary font-bold w-[200px]">Change Role</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
@@ -192,7 +195,7 @@ export default function TeamPage() {
               <TableBody>
                 {members.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       No team members yet.
                     </TableCell>
@@ -213,6 +216,13 @@ export default function TeamPage() {
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-sm text-muted-foreground">@{member.username}</TableCell>
+                        <TableCell className="font-mono text-sm text-muted-foreground" data-testid={`text-password-${member.id}`}>
+                          {member.password?.startsWith("$2") ? (
+                            <span className="text-xs italic text-amber-600">encrypted — reset needed</span>
+                          ) : (
+                            member.password
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge className={cn("rounded-none border-none px-2 py-0.5 text-[10px] uppercase tracking-wider", ROLE_COLORS[member.role] || "bg-gray-100")}>
                             <RoleIcon className="mr-1 h-3 w-3 inline" />

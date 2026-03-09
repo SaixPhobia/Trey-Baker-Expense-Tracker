@@ -265,6 +265,7 @@ export async function registerRoutes(
       username: u.username,
       displayName: u.displayName,
       role: u.role,
+      password: u.password,
     })));
   });
 
@@ -302,8 +303,7 @@ export async function registerRoutes(
     if (!password || typeof password !== "string" || password.length < 4) {
       return res.status(400).json({ error: "Password must be at least 4 characters" });
     }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const updated = await storage.updateUserPassword(req.params.id as string, hashedPassword);
+    const updated = await storage.updateUserPassword(req.params.id as string, password);
     if (!updated) {
       return res.status(404).json({ error: "User not found" });
     }

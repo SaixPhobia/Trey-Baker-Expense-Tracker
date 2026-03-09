@@ -46,13 +46,12 @@ export function setupAuth(app: Express) {
         return res.status(409).json({ error: "Username already taken" });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
       const userCount = await storage.getUserCount();
       const role = userCount === 0 ? "Owner" : "Staff";
 
       const user = await storage.createUserWithRole({
         username,
-        password: hashedPassword,
+        password,
         displayName: displayName || username,
       }, role);
 
@@ -82,7 +81,7 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ error: "Invalid username or password" });
       }
 
-      const valid = await bcrypt.compare(password, user.password);
+      const valid = password === user.password;
       if (!valid) {
         return res.status(401).json({ error: "Invalid username or password" });
       }
