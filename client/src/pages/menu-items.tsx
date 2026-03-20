@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Loader2, CakeSlice, Package, X } from "lucide-react";
+import { Plus, Trash2, Loader2, CakeSlice, Package, X, ChefHat } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +28,122 @@ import type { MenuItem, Ingredient, MenuItemIngredient } from "@shared/schema";
 import { useAuth } from "@/lib/auth";
 
 const MENU_CATEGORIES = ["Food", "Drinks", "Seasonal Food", "Seasonal Drinks"];
+
+function LogProductionDialog({ menuItem }: { menuItem: MenuItem }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [qty, setQty] = useState("1");
+
+  const { data: linkedIngredients = [] } = useQuery<MenuItemIngredient[]>({
+    queryKey: [`/api/menu-items/${menuItem.id}/ingredients`],
+    queryFn: async () => {
+      const res = await fetch(`/api/menu-items/${menuItem.id}/ingredients`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  const { data: allIngredients = [] } = useQuery<Ingredient[]>({
+    queryKey: ["/api/ingredients"],
+    queryFn: async () => {
+      const res = await fetch("/api/ingredients");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  const logMutation = useMutation({
+    mutationFn: async (quantity: number) => {
+      const res = await fetch(`/api/menu-items/${menuItem.id}/log-production`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to log production");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
+      setOpen(false);
+      setQty("1");
+      toast({ title: "Production Logged", description: `Inventory updated for ${menuItem.name}.` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const batchQty = Math.max(1, parseInt(qty) || 1);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQty("1"); }}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary" data-testid={`button-log-production-${menuItem.id}`}>
+          <ChefHat className="h-4 w-4 mr-1" /> Log Production
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="rounded-none sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle className="font-serif">Log Production — {menuItem.name}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="grid gap-2">
+            <Label>How many did you make?</Label>
+            <Input
+              type="number"
+              min="1"
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              className="rounded-none border-muted w-32"
+              data-testid="input-production-qty"
+            />
+          </div>
+          {linkedIngredients.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Ingredients to be deducted</p>
+              {linkedIngredients.map((li) => {
+                const ing = allIngredients.find(i => i.id === li.ingredientId);
+                if (!ing) return null;
+                const deduct = parseFloat(li.quantityNeeded) * batchQty;
+                const remaining = Math.max(0, parseFloat(ing.quantity) - deduct);
+                return (
+                  <div key={li.ingredientId} className="flex items-center justify-between p-3 bg-muted/20 border border-border text-sm" data-testid={`production-deduct-${li.ingredientId}`}>
+                    <span className="font-medium">{ing.name}</span>
+                    <div className="text-right">
+                      <span className="text-destructive font-mono">−{deduct.toFixed(2)} {ing.unit}</span>
+                      <span className="text-muted-foreground ml-2 font-mono text-xs">→ {remaining.toFixed(2)} left</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              No ingredients linked to this item. Add them using the Ingredients button.
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            onClick={() => logMutation.mutate(batchQty)}
+            className="rounded-none w-full"
+            disabled={linkedIngredients.length === 0 || logMutation.isPending}
+            data-testid="button-confirm-production"
+          >
+            {logMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Confirm & Deduct Inventory
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function IngredientsDialog({ menuItem, canManage }: { menuItem: MenuItem; canManage: boolean }) {
   const { toast } = useToast();
@@ -407,8 +523,9 @@ export default function MenuItemsPage() {
                           <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
                         </CardContent>
                       )}
-                      <CardFooter className="pt-2 flex justify-between">
+                      <CardFooter className="pt-2 flex flex-wrap gap-1 justify-between">
                         <IngredientsDialog menuItem={item} canManage={canManage} />
+                        {canManage && <LogProductionDialog menuItem={item} />}
                         {canManage && (
                           <Button
                             variant="ghost"

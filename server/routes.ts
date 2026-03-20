@@ -182,6 +182,17 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.post("/api/menu-items/:id/log-production", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const menuItemId = getParamId(req);
+    const { quantity } = req.body;
+    const qty = parseInt(quantity);
+    if (!qty || qty < 1) {
+      return res.status(400).json({ error: "Quantity must be at least 1" });
+    }
+    const result = await storage.deductIngredients(menuItemId, qty);
+    res.json(result);
+  });
+
   // ============ RECEIPTS ============
   app.get("/api/receipts", requireAuth, async (req, res) => {
     const allReceipts = await storage.getReceipts();

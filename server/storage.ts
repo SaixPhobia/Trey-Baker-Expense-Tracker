@@ -54,6 +54,7 @@ export interface IStorage {
   updateOrder(id: number, order: Partial<InsertOrder>): Promise<Order | undefined>;
   deleteOrder(id: number): Promise<boolean>;
 
+  deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string }[]>;
   getMenuItemIngredients(menuItemId: number): Promise<MenuItemIngredient[]>;
   setMenuItemIngredients(menuItemId: number, items: InsertMenuItemIngredient[]): Promise<MenuItemIngredient[]>;
 
@@ -229,6 +230,21 @@ export class DatabaseStorage implements IStorage {
   async deleteOrder(id: number): Promise<boolean> {
     await db.delete(orders).where(eq(orders.id, id));
     return true;
+  }
+
+  async deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string }[]> {
+    const links = await db.select().from(menuItemIngredients).where(eq(menuItemIngredients.menuItemId, menuItemId));
+    const results = [];
+    for (const link of links) {
+      const deducted = parseFloat(link.quantityNeeded) * batchQty;
+      const [ing] = await db.select().from(ingredients).where(eq(ingredients.id, link.ingredientId));
+      if (ing) {
+        const newQty = Math.max(0, parseFloat(ing.quantity) - deducted);
+        await db.update(ingredients).set({ quantity: newQty.toFixed(2) }).where(eq(ingredients.id, ing.id));
+        results.push({ ingredientId: ing.id, deducted, remaining: newQty.toFixed(2) });
+      }
+    }
+    return results;
   }
 
   async getMenuItemIngredients(menuItemId: number): Promise<MenuItemIngredient[]> {
