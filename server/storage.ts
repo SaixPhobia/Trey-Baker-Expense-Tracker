@@ -55,6 +55,7 @@ export interface IStorage {
   deleteOrder(id: number): Promise<boolean>;
 
   deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string }[]>;
+  getAllMenuItemIngredients(): Promise<MenuItemIngredient[]>;
   getMenuItemIngredients(menuItemId: number): Promise<MenuItemIngredient[]>;
   setMenuItemIngredients(menuItemId: number, items: InsertMenuItemIngredient[]): Promise<MenuItemIngredient[]>;
 
@@ -230,6 +231,10 @@ export class DatabaseStorage implements IStorage {
   async deleteOrder(id: number): Promise<boolean> {
     await db.delete(orders).where(eq(orders.id, id));
     return true;
+  }
+
+  async getAllMenuItemIngredients(): Promise<MenuItemIngredient[]> {
+    return db.select().from(menuItemIngredients);
   }
 
   async deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string }[]> {

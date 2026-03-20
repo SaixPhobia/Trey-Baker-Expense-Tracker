@@ -182,6 +182,23 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.get("/api/all-menu-item-ingredients", requireAuth, async (req, res) => {
+    const all = await storage.getAllMenuItemIngredients();
+    res.json(all);
+  });
+
+  app.post("/api/production/log-batch", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const schema = z.array(z.object({ menuItemId: z.number(), quantity: z.number().int().min(1) }));
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const results = [];
+    for (const entry of parsed.data) {
+      const r = await storage.deductIngredients(entry.menuItemId, entry.quantity);
+      results.push(...r);
+    }
+    res.json(results);
+  });
+
   app.post("/api/menu-items/:id/log-production", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
     const menuItemId = getParamId(req);
     const { quantity } = req.body;

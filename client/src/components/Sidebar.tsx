@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, Bell, LogOut, Package, CakeSlice, Shield, Users, ClipboardList, ReceiptText } from "lucide-react";
+import { LayoutDashboard, Receipt, Calculator, Settings, ChefHat, User, Bell, LogOut, Package, CakeSlice, Shield, Users, ClipboardList, ReceiptText, FlaskConical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,7 @@ export function Sidebar() {
     { href: "/menu-items", label: "Menu Items", icon: CakeSlice },
     { href: "/orders", label: "Orders", icon: ClipboardList },
     { href: "/receipts", label: "Receipts", icon: ReceiptText },
+    { href: "/production", label: "Production", icon: FlaskConical },
     { href: "/pricing", label: "Price Calculator", icon: Calculator },
     ...(user?.role === "Owner" ? [{ href: "/team", label: "Team", icon: Users }] : []),
   ];
