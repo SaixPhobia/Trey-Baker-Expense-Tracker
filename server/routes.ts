@@ -207,7 +207,8 @@ export async function registerRoutes(
     const results = [];
     for (const entry of parsed.data) {
       const r = await storage.deductIngredients(entry.menuItemId, entry.quantity);
-      await storage.createProductionLog({ menuItemId: entry.menuItemId, menuItemName: entry.menuItemName, quantity: entry.quantity, loggedBy });
+      const ingredientCost = r.reduce((sum, x) => sum + x.cost, 0).toFixed(2);
+      await storage.createProductionLog({ menuItemId: entry.menuItemId, menuItemName: entry.menuItemName, quantity: entry.quantity, loggedBy, ingredientCost });
       results.push(...r);
     }
     res.json(results);
@@ -226,7 +227,8 @@ export async function registerRoutes(
     const menuItem = await storage.getMenuItem(menuItemId);
     const result = await storage.deductIngredients(menuItemId, qty);
     if (menuItem) {
-      await storage.createProductionLog({ menuItemId, menuItemName: menuItem.name, quantity: qty, loggedBy });
+      const ingredientCost = result.reduce((sum, x) => sum + x.cost, 0).toFixed(2);
+      await storage.createProductionLog({ menuItemId, menuItemName: menuItem.name, quantity: qty, loggedBy, ingredientCost });
     }
     res.json(result);
   });

@@ -111,6 +111,7 @@ export const productionLogs = pgTable("production_logs", {
   menuItemId: integer("menu_item_id").notNull(),
   menuItemName: text("menu_item_name").notNull(),
   quantity: integer("quantity").notNull(),
+  ingredientCost: decimal("ingredient_cost", { precision: 10, scale: 2 }).notNull().default("0"),
   loggedAt: timestamp("logged_at").notNull().defaultNow(),
   loggedBy: text("logged_by").notNull().default(""),
 });

@@ -55,7 +55,7 @@ export interface IStorage {
   updateOrder(id: number, order: Partial<InsertOrder>): Promise<Order | undefined>;
   deleteOrder(id: number): Promise<boolean>;
 
-  deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string }[]>;
+  deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string; cost: number }[]>;
   getAllMenuItemIngredients(): Promise<MenuItemIngredient[]>;
   createProductionLog(log: InsertProductionLog): Promise<ProductionLog>;
   getProductionLogs(): Promise<ProductionLog[]>;
@@ -258,7 +258,7 @@ export class DatabaseStorage implements IStorage {
     return { inventoryValue, totalProduced };
   }
 
-  async deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string }[]> {
+  async deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string; cost: number }[]> {
     const links = await db.select().from(menuItemIngredients).where(eq(menuItemIngredients.menuItemId, menuItemId));
     const results = [];
     for (const link of links) {
@@ -266,8 +266,9 @@ export class DatabaseStorage implements IStorage {
       const [ing] = await db.select().from(ingredients).where(eq(ingredients.id, link.ingredientId));
       if (ing) {
         const newQty = Math.max(0, parseFloat(ing.quantity) - deducted);
+        const cost = deducted * parseFloat(ing.costPerUnit);
         await db.update(ingredients).set({ quantity: newQty.toFixed(2) }).where(eq(ingredients.id, ing.id));
-        results.push({ ingredientId: ing.id, deducted, remaining: newQty.toFixed(2) });
+        results.push({ ingredientId: ing.id, deducted, remaining: newQty.toFixed(2), cost });
       }
     }
     return results;
