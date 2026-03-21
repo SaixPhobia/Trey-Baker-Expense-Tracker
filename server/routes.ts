@@ -187,13 +187,27 @@ export async function registerRoutes(
     res.json(all);
   });
 
+  app.get("/api/stats", requireAuth, async (req, res) => {
+    const stats = await storage.getStats();
+    res.json(stats);
+  });
+
+  app.get("/api/production/logs", requireAuth, async (req, res) => {
+    const logs = await storage.getProductionLogs();
+    res.json(logs);
+  });
+
   app.post("/api/production/log-batch", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
-    const schema = z.array(z.object({ menuItemId: z.number(), quantity: z.number().int().min(1) }));
+    const schema = z.array(z.object({ menuItemId: z.number(), quantity: z.number().int().min(1), menuItemName: z.string() }));
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const userId = (req.session as any).userId as string;
+    const sessionUser = await storage.getUser(userId);
+    const loggedBy = sessionUser?.displayName || sessionUser?.username || "";
     const results = [];
     for (const entry of parsed.data) {
       const r = await storage.deductIngredients(entry.menuItemId, entry.quantity);
+      await storage.createProductionLog({ menuItemId: entry.menuItemId, menuItemName: entry.menuItemName, quantity: entry.quantity, loggedBy });
       results.push(...r);
     }
     res.json(results);
@@ -206,7 +220,14 @@ export async function registerRoutes(
     if (!qty || qty < 1) {
       return res.status(400).json({ error: "Quantity must be at least 1" });
     }
+    const userId = (req.session as any).userId as string;
+    const sessionUser = await storage.getUser(userId);
+    const loggedBy = sessionUser?.displayName || sessionUser?.username || "";
+    const menuItem = await storage.getMenuItem(menuItemId);
     const result = await storage.deductIngredients(menuItemId, qty);
+    if (menuItem) {
+      await storage.createProductionLog({ menuItemId, menuItemName: menuItem.name, quantity: qty, loggedBy });
+    }
     res.json(result);
   });
 

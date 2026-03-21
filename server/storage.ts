@@ -9,11 +9,12 @@ import {
   type MenuItemIngredient, type InsertMenuItemIngredient,
   type Receipt, type InsertReceipt,
   type ReceiptItem, type InsertReceiptItem,
+  type ProductionLog, type InsertProductionLog,
   users, ingredients, menuItems, expenses, expenseCategories, profileSettings, orders,
-  menuItemIngredients, receipts, receiptItems
+  menuItemIngredients, receipts, receiptItems, productionLogs
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -56,6 +57,9 @@ export interface IStorage {
 
   deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string }[]>;
   getAllMenuItemIngredients(): Promise<MenuItemIngredient[]>;
+  createProductionLog(log: InsertProductionLog): Promise<ProductionLog>;
+  getProductionLogs(): Promise<ProductionLog[]>;
+  getStats(): Promise<{ inventoryValue: number; totalProduced: number }>;
   getMenuItemIngredients(menuItemId: number): Promise<MenuItemIngredient[]>;
   setMenuItemIngredients(menuItemId: number, items: InsertMenuItemIngredient[]): Promise<MenuItemIngredient[]>;
 
@@ -235,6 +239,23 @@ export class DatabaseStorage implements IStorage {
 
   async getAllMenuItemIngredients(): Promise<MenuItemIngredient[]> {
     return db.select().from(menuItemIngredients);
+  }
+
+  async createProductionLog(log: InsertProductionLog): Promise<ProductionLog> {
+    const [created] = await db.insert(productionLogs).values(log).returning();
+    return created;
+  }
+
+  async getProductionLogs(): Promise<ProductionLog[]> {
+    return db.select().from(productionLogs).orderBy(desc(productionLogs.loggedAt));
+  }
+
+  async getStats(): Promise<{ inventoryValue: number; totalProduced: number }> {
+    const ings = await db.select().from(ingredients);
+    const inventoryValue = ings.reduce((sum, i) => sum + parseFloat(i.quantity) * parseFloat(i.costPerUnit), 0);
+    const [row] = await db.select({ total: sql<string>`coalesce(sum(quantity), 0)` }).from(productionLogs);
+    const totalProduced = parseInt(row?.total ?? "0");
+    return { inventoryValue, totalProduced };
   }
 
   async deductIngredients(menuItemId: number, batchQty: number): Promise<{ ingredientId: number; deducted: number; remaining: string }[]> {

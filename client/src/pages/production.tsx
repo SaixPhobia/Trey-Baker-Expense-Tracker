@@ -2,11 +2,11 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
+import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { MenuItem, Ingredient, MenuItemIngredient } from "@shared/schema";
+import type { MenuItem, Ingredient, MenuItemIngredient, ProductionLog } from "@shared/schema";
 import { useAuth } from "@/lib/auth";
 
 export default function ProductionPage() {
@@ -46,8 +46,17 @@ export default function ProductionPage() {
 
   const isLoading = itemsLoading || ingLoading || linksLoading;
 
+  const { data: productionLogs = [] } = useQuery<ProductionLog[]>({
+    queryKey: ["/api/production/logs"],
+    queryFn: async () => {
+      const res = await fetch("/api/production/logs");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
   const batchMutation = useMutation({
-    mutationFn: async (items: { menuItemId: number; quantity: number }[]) => {
+    mutationFn: async (items: { menuItemId: number; quantity: number; menuItemName: string }[]) => {
       const res = await fetch("/api/production/log-batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,6 +70,8 @@ export default function ProductionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production/logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       setQuantities({});
       toast({ title: "Production Logged", description: "Ingredient inventory has been updated." });
     },
@@ -110,6 +121,7 @@ export default function ProductionPage() {
     const items = activeItems.map(item => ({
       menuItemId: item.id,
       quantity: parseInt(quantities[item.id]),
+      menuItemName: item.name,
     }));
     batchMutation.mutate(items);
   };
@@ -274,6 +286,29 @@ export default function ProductionPage() {
           </div>
         </div>
       )}
+
+      {/* Production History */}
+      <div className="mt-10 border border-border">
+        <div className="flex items-center gap-2 px-6 py-4 border-b border-border">
+          <History className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Production History</h2>
+        </div>
+        {productionLogs.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">No production logged yet.</div>
+        ) : (
+          <div className="divide-y divide-border">
+            {productionLogs.slice(0, 20).map(log => (
+              <div key={log.id} className="flex items-center justify-between px-6 py-3" data-testid={`history-row-${log.id}`}>
+                <div>
+                  <p className="text-sm font-medium">{log.menuItemName}</p>
+                  <p className="text-xs text-muted-foreground">{log.loggedBy} · {new Date(log.loggedAt).toLocaleString()}</p>
+                </div>
+                <Badge variant="secondary" className="rounded-none font-mono">{log.quantity} pcs</Badge>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </Layout>
   );
 }

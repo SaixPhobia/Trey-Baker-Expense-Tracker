@@ -4,6 +4,8 @@
 A business management tool for "Trey Baker" bakery that automates expense reporting, price calculations, ingredient inventory, and menu management. Includes role-based user accounts.
 
 ## Recent Changes
+- **2026-03-21**: Added production tracker - `productionLogs` table records every production run; dashboard shows live inventory value ($) and total items produced
+- **2026-03-21**: Added Production Planner page - batch quantities across all items, see ingredient totals before committing
 - **2026-03-05**: Added menu item ingredient linking - attach ingredients with quantities to menu items, see cost/margin
 - **2026-03-05**: Added receipt system - employees create receipts from menu items, auto-calculated totals with tax, printable receipts
 - **2026-02-07**: Added Orders feature - all team members can submit, Owner/Manager can delete and update status

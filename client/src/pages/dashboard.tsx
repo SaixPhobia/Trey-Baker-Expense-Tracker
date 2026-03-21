@@ -1,6 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { StatsCard } from "@/components/StatsCard";
-import { DollarSign, TrendingUp, Package, CakeSlice, Loader2 } from "lucide-react";
+import { DollarSign, TrendingUp, Package, CakeSlice, Loader2, Boxes, ChefHat } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -47,9 +47,18 @@ export default function DashboardPage() {
     }
   });
 
+  const { data: stats, isLoading: statsLoading } = useQuery<{ inventoryValue: number; totalProduced: number }>({
+    queryKey: ["/api/stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/stats");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    }
+  });
+
   const totalExpenses = expenses.reduce((sum, exp) => sum + (parseFloat(exp.quantity) * parseFloat(exp.amount)), 0);
   const pendingExpenses = expenses.filter(exp => exp.status === "Pending").length;
-  const isLoading = expensesLoading || ingredientsLoading || menuItemsLoading;
+  const isLoading = expensesLoading || ingredientsLoading || menuItemsLoading || statsLoading;
 
   return (
     <Layout>
@@ -61,13 +70,27 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-4">
         <StatsCard 
           title="Total Expenses" 
           value={isLoading ? "..." : `$${totalExpenses.toFixed(2)}`}
           description={`${expenses.length} entries`}
           icon={DollarSign}
         />
+        <StatsCard 
+          title="Inventory Value" 
+          value={isLoading ? "..." : `$${(stats?.inventoryValue ?? 0).toFixed(2)}`}
+          description="Current ingredient stock value"
+          icon={Boxes}
+        />
+        <StatsCard 
+          title="Items Produced" 
+          value={isLoading ? "..." : (stats?.totalProduced ?? 0).toLocaleString()}
+          description="Total across all production logs"
+          icon={ChefHat}
+        />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <StatsCard 
           title="Pending Approval" 
           value={isLoading ? "..." : pendingExpenses.toString()}

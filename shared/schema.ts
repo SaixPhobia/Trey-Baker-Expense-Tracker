@@ -106,6 +106,19 @@ export const insertReceiptItemSchema = createInsertSchema(receiptItems).omit({ i
 export type InsertReceiptItem = z.infer<typeof insertReceiptItemSchema>;
 export type ReceiptItem = typeof receiptItems.$inferSelect;
 
+export const productionLogs = pgTable("production_logs", {
+  id: serial("id").primaryKey(),
+  menuItemId: integer("menu_item_id").notNull(),
+  menuItemName: text("menu_item_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  loggedAt: timestamp("logged_at").notNull().defaultNow(),
+  loggedBy: text("logged_by").notNull().default(""),
+});
+
+export const insertProductionLogSchema = createInsertSchema(productionLogs).omit({ id: true, loggedAt: true });
+export type InsertProductionLog = z.infer<typeof insertProductionLogSchema>;
+export type ProductionLog = typeof productionLogs.$inferSelect;
+
 export const profileSettings = pgTable("profile_settings", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().default("Jean Dupont"),
