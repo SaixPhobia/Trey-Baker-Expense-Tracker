@@ -55,6 +55,16 @@ export default function ProductionPage() {
     },
   });
 
+  type StockItem = { menuItemId: number; menuItemName: string; basePrice: string; produced: number; sold: number; inStock: number };
+  const { data: stockItems = [], isLoading: stockLoading } = useQuery<StockItem[]>({
+    queryKey: ["/api/stock"],
+    queryFn: async () => {
+      const res = await fetch("/api/stock");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
   const batchMutation = useMutation({
     mutationFn: async (items: { menuItemId: number; quantity: number; menuItemName: string }[]) => {
       const res = await fetch("/api/production/log-batch", {
@@ -72,6 +82,7 @@ export default function ProductionPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production/logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock"] });
       setQuantities({});
       toast({ title: "Production Logged", description: "Ingredient inventory has been updated." });
     },
@@ -287,60 +298,74 @@ export default function ProductionPage() {
         </div>
       )}
 
-      {/* Stock Summary */}
-      {productionLogs.length > 0 && (() => {
-        const stockMap: Record<string, { name: string; qty: number; saleTotal: number; costTotal: number }> = {};
-        for (const log of productionLogs) {
-          const key = String(log.menuItemId);
-          if (!stockMap[key]) stockMap[key] = { name: log.menuItemName, qty: 0, saleTotal: 0, costTotal: 0 };
-          stockMap[key].qty += log.quantity;
-          stockMap[key].saleTotal += parseFloat(log.saleAmount);
-          stockMap[key].costTotal += parseFloat(log.ingredientCost);
-        }
-        const rows = Object.values(stockMap).sort((a, b) => b.saleTotal - a.saleTotal);
-        const grandQty = rows.reduce((s, r) => s + r.qty, 0);
-        const grandSale = rows.reduce((s, r) => s + r.saleTotal, 0);
-        const grandCost = rows.reduce((s, r) => s + r.costTotal, 0);
-
-        return (
-          <div className="mt-10 border border-border" data-testid="stock-summary">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <div className="flex items-center gap-2">
-                <PackageCheck className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Stock from Production</h2>
-              </div>
-              <p className="text-xs text-muted-foreground">All-time totals per item</p>
-            </div>
-
-            <div className="divide-y divide-border">
-              {/* Header row */}
-              <div className="grid grid-cols-4 px-6 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/20">
-                <span>Item</span>
-                <span className="text-center">Units Produced</span>
-                <span className="text-right">Ingredient Cost</span>
-                <span className="text-right">Sale Value</span>
-              </div>
-
-              {rows.map(row => (
-                <div key={row.name} className="grid grid-cols-4 px-6 py-3 items-center" data-testid={`stock-row-${row.name}`}>
-                  <span className="text-sm font-medium">{row.name}</span>
-                  <span className="text-center font-mono text-sm">{row.qty.toLocaleString()} pcs</span>
-                  <span className="text-right font-mono text-sm text-muted-foreground">${row.costTotal.toFixed(2)}</span>
-                  <span className="text-right font-mono text-sm font-semibold text-emerald-600">${row.saleTotal.toFixed(2)}</span>
-                </div>
-              ))}
-
-              {/* Grand total */}
-              <div className="grid grid-cols-4 px-6 py-3 items-center bg-muted/20 border-t-2 border-border">
-                <span className="text-sm font-bold">Total</span>
-                <span className="text-center font-mono text-sm font-bold">{grandQty.toLocaleString()} pcs</span>
-                <span className="text-right font-mono text-sm font-bold">${grandCost.toFixed(2)}</span>
-                <span className="text-right font-mono text-sm font-bold text-emerald-600">${grandSale.toFixed(2)}</span>
-              </div>
-            </div>
+      {/* Current Stock */}
+      <div className="mt-10 border border-border" data-testid="current-stock">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <PackageCheck className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Current Stock</h2>
           </div>
-        );
-      })()}
+          <p className="text-xs text-muted-foreground">Produced minus sold via receipts</p>
+        </div>
+
+        {stockLoading ? (
+          <div className="flex items-center justify-center h-20">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          </div>
+        ) : stockItems.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">No production logged yet. Log a batch above to track stock.</div>
+        ) : (
+          <div className="divide-y divide-border">
+            {/* Header */}
+            <div className="grid grid-cols-5 px-6 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/20">
+              <span className="col-span-2">Item</span>
+              <span className="text-center">Produced</span>
+              <span className="text-center">Sold</span>
+              <span className="text-right">In Stock</span>
+            </div>
+
+            {stockItems.map(item => {
+              const stockValue = item.inStock * parseFloat(item.basePrice);
+              const low = item.inStock === 0;
+              return (
+                <div key={item.menuItemId} className={`grid grid-cols-5 px-6 py-3 items-center ${low ? "bg-destructive/5" : ""}`} data-testid={`stock-item-${item.menuItemId}`}>
+                  <div className="col-span-2">
+                    <p className="text-sm font-medium">{item.menuItemName}</p>
+                    <p className="text-xs text-muted-foreground font-mono">${stockValue.toFixed(2)} value</p>
+                  </div>
+                  <span className="text-center font-mono text-sm text-muted-foreground">{item.produced}</span>
+                  <span className="text-center font-mono text-sm text-muted-foreground">{item.sold}</span>
+                  <div className="text-right">
+                    <span className={`font-mono text-sm font-bold ${low ? "text-destructive" : "text-emerald-600"}`}>
+                      {item.inStock} pcs
+                    </span>
+                    {low && <p className="text-[10px] text-destructive uppercase tracking-wider">Out of stock</p>}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Totals row */}
+            {(() => {
+              const totalInStock = stockItems.reduce((s, i) => s + i.inStock, 0);
+              const totalValue = stockItems.reduce((s, i) => s + i.inStock * parseFloat(i.basePrice), 0);
+              const totalProduced = stockItems.reduce((s, i) => s + i.produced, 0);
+              const totalSold = stockItems.reduce((s, i) => s + i.sold, 0);
+              return (
+                <div className="grid grid-cols-5 px-6 py-3 items-center bg-muted/20 border-t-2 border-border">
+                  <div className="col-span-2">
+                    <p className="text-sm font-bold">Total</p>
+                    <p className="text-xs font-mono font-bold text-emerald-600">${totalValue.toFixed(2)} value</p>
+                  </div>
+                  <span className="text-center font-mono text-sm font-bold">{totalProduced}</span>
+                  <span className="text-center font-mono text-sm font-bold">{totalSold}</span>
+                  <span className="text-right font-mono text-sm font-bold text-emerald-600">{totalInStock} pcs</span>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </div>
 
       {/* Production History */}
       <div className="mt-10 border border-border">

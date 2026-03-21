@@ -192,6 +192,11 @@ export async function registerRoutes(
     res.json(stats);
   });
 
+  app.get("/api/stock", requireAuth, async (req, res) => {
+    const stock = await storage.getCurrentStock();
+    res.json(stock);
+  });
+
   app.get("/api/production/logs", requireAuth, async (req, res) => {
     const logs = await storage.getProductionLogs();
     res.json(logs);

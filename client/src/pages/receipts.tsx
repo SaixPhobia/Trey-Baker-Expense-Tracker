@@ -168,6 +168,7 @@ export default function ReceiptsPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock"] });
       setShowNewReceipt(false);
       setCart([]);
       toast({ title: "Receipt Created", description: `Receipt #${data.id} has been saved.` });

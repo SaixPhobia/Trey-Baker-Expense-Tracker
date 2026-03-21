@@ -60,6 +60,7 @@ export interface IStorage {
   createProductionLog(log: InsertProductionLog): Promise<ProductionLog>;
   getProductionLogs(): Promise<ProductionLog[]>;
   getStats(): Promise<{ inventoryValue: number; totalProduced: number }>;
+  getCurrentStock(): Promise<{ menuItemId: number; menuItemName: string; basePrice: string; produced: number; sold: number; inStock: number }[]>;
   getMenuItemIngredients(menuItemId: number): Promise<MenuItemIngredient[]>;
   setMenuItemIngredients(menuItemId: number, items: InsertMenuItemIngredient[]): Promise<MenuItemIngredient[]>;
 
@@ -248,6 +249,34 @@ export class DatabaseStorage implements IStorage {
 
   async getProductionLogs(): Promise<ProductionLog[]> {
     return db.select().from(productionLogs).orderBy(desc(productionLogs.loggedAt));
+  }
+
+  async getCurrentStock(): Promise<{ menuItemId: number; menuItemName: string; basePrice: string; produced: number; sold: number; inStock: number }[]> {
+    const allItems = await db.select().from(menuItems);
+    const allLogs = await db.select().from(productionLogs);
+    const allReceiptItems = await db.select().from(receiptItems);
+
+    const producedMap: Record<number, number> = {};
+    for (const log of allLogs) {
+      producedMap[log.menuItemId] = (producedMap[log.menuItemId] || 0) + log.quantity;
+    }
+
+    const soldMap: Record<number, number> = {};
+    for (const ri of allReceiptItems) {
+      if (ri.menuItemId != null) {
+        soldMap[ri.menuItemId] = (soldMap[ri.menuItemId] || 0) + ri.quantity;
+      }
+    }
+
+    return allItems
+      .filter(item => producedMap[item.id] > 0)
+      .map(item => {
+        const produced = producedMap[item.id] || 0;
+        const sold = soldMap[item.id] || 0;
+        const inStock = Math.max(0, produced - sold);
+        return { menuItemId: item.id, menuItemName: item.name, basePrice: item.basePrice, produced, sold, inStock };
+      })
+      .sort((a, b) => b.inStock - a.inStock);
   }
 
   async getStats(): Promise<{ inventoryValue: number; totalProduced: number }> {
