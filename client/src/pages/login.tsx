@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ChefHat, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -15,6 +16,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetUsername, setResetUsername] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !password) return;
@@ -22,13 +29,38 @@ export default function LoginPage() {
     try {
       await login(username, password);
     } catch (err: any) {
-      toast({
-        title: "Login Failed",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Login Failed", description: err.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOpenReset = () => {
+    setResetUsername("");
+    setResetNewPassword("");
+    setResetDone(false);
+    setResetOpen(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetUsername || resetNewPassword.length < 4) return;
+    setResetLoading(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: resetUsername, newPassword: resetNewPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Error", description: data.error, variant: "destructive" });
+      } else {
+        setResetDone(true);
+      }
+    } catch {
+      toast({ title: "Error", description: "Something went wrong.", variant: "destructive" });
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -59,7 +91,17 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <button
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={handleOpenReset}
+                  data-testid="link-forgot-password"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -81,10 +123,7 @@ export default function LoginPage() {
               Sign In
             </Button>
           </form>
-          <p className="text-center text-xs text-muted-foreground mt-4">
-            Forgot your password? Ask your Owner to reset it from the Team page.
-          </p>
-          <p className="text-center text-sm text-muted-foreground mt-2">
+          <p className="text-center text-sm text-muted-foreground mt-4">
             Don't have an account?{" "}
             <Link href="/register" className="text-primary hover:underline" data-testid="link-register">
               Create one
@@ -92,6 +131,69 @@ export default function LoginPage() {
           </p>
         </CardContent>
       </Card>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent className="rounded-none sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Reset Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {resetDone ? (
+              <div className="p-4 bg-green-50 border border-green-200 text-green-700 text-sm">
+                Password reset successfully. You can now log in with your new password.
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">Enter your username and choose a new password.</p>
+                <div className="grid gap-2">
+                  <Label htmlFor="reset-username">Username</Label>
+                  <Input
+                    id="reset-username"
+                    value={resetUsername}
+                    onChange={(e) => setResetUsername(e.target.value)}
+                    placeholder="Enter your username"
+                    className="rounded-none border-muted"
+                    data-testid="input-reset-username"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="reset-new-password">New Password</Label>
+                  <Input
+                    id="reset-new-password"
+                    type="password"
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    placeholder="Enter new password (min 4 characters)"
+                    className="rounded-none border-muted"
+                    data-testid="input-reset-new-password"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            {resetDone ? (
+              <Button
+                onClick={() => { setResetOpen(false); setUsername(resetUsername); setPassword(""); }}
+                className="rounded-none w-full"
+                data-testid="button-back-to-login"
+              >
+                Back to Login
+              </Button>
+            ) : (
+              <Button
+                onClick={handleResetPassword}
+                className="rounded-none w-full"
+                disabled={!resetUsername || resetNewPassword.length < 4 || resetLoading}
+                data-testid="button-confirm-reset"
+              >
+                {resetLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Set New Password
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
