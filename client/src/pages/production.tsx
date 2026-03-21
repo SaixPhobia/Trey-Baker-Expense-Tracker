@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw, History } from "lucide-react";
+import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw, History, PackageCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -286,6 +286,61 @@ export default function ProductionPage() {
           </div>
         </div>
       )}
+
+      {/* Stock Summary */}
+      {productionLogs.length > 0 && (() => {
+        const stockMap: Record<string, { name: string; qty: number; saleTotal: number; costTotal: number }> = {};
+        for (const log of productionLogs) {
+          const key = String(log.menuItemId);
+          if (!stockMap[key]) stockMap[key] = { name: log.menuItemName, qty: 0, saleTotal: 0, costTotal: 0 };
+          stockMap[key].qty += log.quantity;
+          stockMap[key].saleTotal += parseFloat(log.saleAmount);
+          stockMap[key].costTotal += parseFloat(log.ingredientCost);
+        }
+        const rows = Object.values(stockMap).sort((a, b) => b.saleTotal - a.saleTotal);
+        const grandQty = rows.reduce((s, r) => s + r.qty, 0);
+        const grandSale = rows.reduce((s, r) => s + r.saleTotal, 0);
+        const grandCost = rows.reduce((s, r) => s + r.costTotal, 0);
+
+        return (
+          <div className="mt-10 border border-border" data-testid="stock-summary">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div className="flex items-center gap-2">
+                <PackageCheck className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Stock from Production</h2>
+              </div>
+              <p className="text-xs text-muted-foreground">All-time totals per item</p>
+            </div>
+
+            <div className="divide-y divide-border">
+              {/* Header row */}
+              <div className="grid grid-cols-4 px-6 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/20">
+                <span>Item</span>
+                <span className="text-center">Units Produced</span>
+                <span className="text-right">Ingredient Cost</span>
+                <span className="text-right">Sale Value</span>
+              </div>
+
+              {rows.map(row => (
+                <div key={row.name} className="grid grid-cols-4 px-6 py-3 items-center" data-testid={`stock-row-${row.name}`}>
+                  <span className="text-sm font-medium">{row.name}</span>
+                  <span className="text-center font-mono text-sm">{row.qty.toLocaleString()} pcs</span>
+                  <span className="text-right font-mono text-sm text-muted-foreground">${row.costTotal.toFixed(2)}</span>
+                  <span className="text-right font-mono text-sm font-semibold text-emerald-600">${row.saleTotal.toFixed(2)}</span>
+                </div>
+              ))}
+
+              {/* Grand total */}
+              <div className="grid grid-cols-4 px-6 py-3 items-center bg-muted/20 border-t-2 border-border">
+                <span className="text-sm font-bold">Total</span>
+                <span className="text-center font-mono text-sm font-bold">{grandQty.toLocaleString()} pcs</span>
+                <span className="text-right font-mono text-sm font-bold">${grandCost.toFixed(2)}</span>
+                <span className="text-right font-mono text-sm font-bold text-emerald-600">${grandSale.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Production History */}
       <div className="mt-10 border border-border">
