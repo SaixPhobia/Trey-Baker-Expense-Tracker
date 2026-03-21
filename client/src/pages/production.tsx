@@ -303,11 +303,16 @@ export default function ProductionPage() {
                   <p className="text-sm font-medium">{log.menuItemName}</p>
                   <p className="text-xs text-muted-foreground">{log.loggedBy} · {new Date(log.loggedAt).toLocaleString()}</p>
                 </div>
-                <div className="flex items-center gap-3 text-right">
-                  <span className="text-xs text-muted-foreground font-mono" data-testid={`history-cost-${log.id}`}>
-                    ${parseFloat(log.ingredientCost).toFixed(2)} in ingredients
-                  </span>
-                  <Badge variant="secondary" className="rounded-none font-mono">{log.quantity} pcs</Badge>
+                <div className="flex items-center gap-4 text-right">
+                  <div className="text-xs space-y-0.5">
+                    <p className="text-emerald-600 font-mono font-medium" data-testid={`history-sale-${log.id}`}>
+                      ${parseFloat(log.saleAmount).toFixed(2)} sales
+                    </p>
+                    <p className="text-muted-foreground font-mono" data-testid={`history-cost-${log.id}`}>
+                      ${parseFloat(log.ingredientCost).toFixed(2)} cost
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="rounded-none font-mono shrink-0">{log.quantity} pcs</Badge>
                 </div>
               </div>
             ))}
