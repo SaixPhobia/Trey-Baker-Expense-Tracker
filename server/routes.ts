@@ -369,8 +369,8 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  // ============ FORGOT PASSWORD ============
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  // ============ FORGOT PASSWORD (Owner only) ============
+  app.post("/api/auth/forgot-password", requireAuth, requireRole("Owner"), async (req, res) => {
     const { username } = req.body;
     if (!username) {
       return res.status(400).json({ error: "Username is required" });
@@ -378,9 +378,6 @@ export async function registerRoutes(
     const user = await storage.getUserByUsername(username);
     if (!user) {
       return res.status(404).json({ error: "No account found with that username" });
-    }
-    if (user.password?.startsWith("$2")) {
-      return res.status(400).json({ error: "This account has an encrypted password. Please use the reset option below to set a new one." });
     }
     res.json({ password: user.password });
   });
