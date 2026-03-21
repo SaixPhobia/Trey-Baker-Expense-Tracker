@@ -226,6 +226,15 @@ export default function ReceiptsPage() {
     setCart(updated);
   };
 
+  const setQuantityDirect = (index: number, value: string) => {
+    const num = parseInt(value, 10);
+    if (isNaN(num) || num < 1) return;
+    const updated = [...cart];
+    updated[index].quantity = num;
+    updated[index].lineTotal = num * updated[index].unitPrice;
+    setCart(updated);
+  };
+
   const removeFromCart = (index: number) => {
     setCart(cart.filter((_, i) => i !== index));
   };
@@ -376,11 +385,19 @@ export default function ReceiptsPage() {
                           <TableCell className="font-medium text-sm">{item.itemName}</TableCell>
                           <TableCell>
                             <div className="flex items-center justify-center gap-1">
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => updateQuantity(idx, -1)}>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => updateQuantity(idx, -1)} data-testid={`button-qty-minus-${idx}`}>
                                 <Minus className="h-3 w-3" />
                               </Button>
-                              <span className="font-mono text-sm w-8 text-center">{item.quantity}</span>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => updateQuantity(idx, 1)}>
+                              <input
+                                type="number"
+                                min={1}
+                                value={item.quantity}
+                                onChange={e => setQuantityDirect(idx, e.target.value)}
+                                onFocus={e => e.target.select()}
+                                className="font-mono text-sm w-12 text-center border border-border bg-background px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                data-testid={`input-qty-${idx}`}
+                              />
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => updateQuantity(idx, 1)} data-testid={`button-qty-plus-${idx}`}>
                                 <Plus className="h-3 w-3" />
                               </Button>
                             </div>
