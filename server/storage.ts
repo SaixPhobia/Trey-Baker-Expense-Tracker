@@ -359,7 +359,8 @@ export class DatabaseStorage implements IStorage {
     const allLogs = await db.select().from(productionLogs);
     const allExpenseRows = await db.select().from(expenses);
 
-    const totalRevenue = allReceipts.reduce((s, r) => s + parseFloat(r.total), 0);
+    const paidReceipts = allReceipts.filter(r => !r.isEmployeeMeal);
+    const totalRevenue = paidReceipts.reduce((s, r) => s + parseFloat(r.total), 0);
     const totalIngredientCost = allLogs.reduce((s, l) => s + parseFloat(l.ingredientCost), 0);
     const totalExpenses = allExpenseRows.reduce((s, e) => s + parseFloat(e.total), 0);
     const netProfit = totalRevenue - totalIngredientCost - totalExpenses;
@@ -372,6 +373,7 @@ export class DatabaseStorage implements IStorage {
         createdBy: r.createdBy,
         total: r.total,
         commission: (parseFloat(r.total) * 0.4).toFixed(2),
+        isEmployeeMeal: r.isEmployeeMeal,
       })),
     };
   }

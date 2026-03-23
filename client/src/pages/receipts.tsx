@@ -134,6 +134,7 @@ export default function ReceiptsPage() {
   const [selectedItem, setSelectedItem] = useState("");
   const [customName, setCustomName] = useState("");
   const [customPrice, setCustomPrice] = useState("");
+  const [isEmployeeMeal, setIsEmployeeMeal] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState<(Receipt & { items?: ReceiptItem[] }) | null>(null);
 
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
@@ -240,7 +241,7 @@ export default function ReceiptsPage() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.lineTotal, 0);
-  const total = subtotal;
+  const total = isEmployeeMeal ? 0 : subtotal;
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
@@ -251,7 +252,8 @@ export default function ReceiptsPage() {
         quantity: i.quantity,
         unitPrice: i.unitPrice.toFixed(2),
       })),
-    });
+      isEmployeeMeal,
+    } as any);
   };
 
   const todayReceipts = allReceipts.filter(r => {
@@ -312,7 +314,7 @@ export default function ReceiptsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="font-serif">New Receipt</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => { setShowNewReceipt(false); setCart([]); }}>
+                <Button variant="ghost" size="sm" onClick={() => { setShowNewReceipt(false); setCart([]); setIsEmployeeMeal(false); }}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -367,6 +369,25 @@ export default function ReceiptsPage() {
                 </Button>
               </div>
 
+              <div className="flex items-center gap-3 p-3 bg-muted/30 border border-border">
+                <button
+                  type="button"
+                  data-testid="toggle-employee-meal-off"
+                  onClick={() => setIsEmployeeMeal(false)}
+                  className={`flex-1 py-1.5 text-xs font-mono font-medium transition-colors ${!isEmployeeMeal ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Regular Sale
+                </button>
+                <button
+                  type="button"
+                  data-testid="toggle-employee-meal-on"
+                  onClick={() => setIsEmployeeMeal(true)}
+                  className={`flex-1 py-1.5 text-xs font-mono font-medium transition-colors ${isEmployeeMeal ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Employee Meal (Free)
+                </button>
+              </div>
+
               {cart.length > 0 && (
                 <div className="border border-border">
                   <Table>
@@ -414,9 +435,17 @@ export default function ReceiptsPage() {
                     </TableBody>
                   </Table>
                   <div className="p-4 bg-muted/10 border-t border-border space-y-1">
+                    {isEmployeeMeal && (
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Subtotal</span>
+                        <span className="font-mono line-through">${subtotal.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <span className="font-mono text-primary" data-testid="text-total">${total.toFixed(2)}</span>
+                      <span className="font-mono text-primary" data-testid="text-total">
+                        {isEmployeeMeal ? <span className="text-green-700">$0.00 <span className="text-xs font-normal">(Employee Meal)</span></span> : `$${total.toFixed(2)}`}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -429,7 +458,7 @@ export default function ReceiptsPage() {
                 data-testid="button-checkout"
               >
                 {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ReceiptText className="h-5 w-5" />}
-                Complete Sale - ${total.toFixed(2)}
+                {isEmployeeMeal ? "Log Employee Meal — $0.00" : `Complete Sale — $${total.toFixed(2)}`}
               </Button>
             </CardContent>
           </Card>
@@ -470,7 +499,12 @@ export default function ReceiptsPage() {
                     <TableCell className="text-sm">{receipt.createdBy}</TableCell>
                     <TableCell className="text-right font-mono font-bold text-primary">${parseFloat(receipt.total).toFixed(2)}</TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="secondary" className="rounded-none font-mono text-xs">{receipt.status}</Badge>
+                      <div className="flex gap-1 justify-center flex-wrap">
+                        <Badge variant="secondary" className="rounded-none font-mono text-xs">{receipt.status}</Badge>
+                        {(receipt as any).isEmployeeMeal && (
+                          <Badge className="rounded-none font-mono text-xs bg-green-100 text-green-800 hover:bg-green-100" data-testid={`badge-employee-meal-${receipt.id}`}>Employee Meal</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>

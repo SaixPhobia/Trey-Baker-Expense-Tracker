@@ -270,6 +270,7 @@ export async function registerRoutes(
         quantity: z.number().min(1),
         unitPrice: z.string(),
       })),
+      isEmployeeMeal: z.boolean().optional().default(false),
     });
     const parsed = bodySchema.safeParse(req.body);
     if (!parsed.success) {
@@ -292,7 +293,8 @@ export async function registerRoutes(
       };
     });
     const subtotal = serverItems.reduce((s, i) => s + parseFloat(i.lineTotal), 0);
-    const total = subtotal;
+    const isEmployeeMeal = parsed.data.isEmployeeMeal ?? false;
+    const total = isEmployeeMeal ? 0 : subtotal;
 
     const receipt = await storage.createReceipt({
       subtotal: subtotal.toFixed(2),
@@ -300,6 +302,7 @@ export async function registerRoutes(
       total: total.toFixed(2),
       createdBy,
       status: "Completed",
+      isEmployeeMeal,
     }, serverItems);
     res.status(201).json(receipt);
   });

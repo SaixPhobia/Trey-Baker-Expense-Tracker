@@ -86,6 +86,7 @@ export const receipts = pgTable("receipts", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0"),
   createdBy: text("created_by").notNull().default(""),
   status: text("status").notNull().default("Completed"),
+  isEmployeeMeal: boolean("is_employee_meal").notNull().default(false),
 });
 
 export const insertReceiptSchema = createInsertSchema(receipts).omit({ id: true, date: true });
