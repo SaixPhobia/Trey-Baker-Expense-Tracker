@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Loader2, ReceiptText, Minus, Printer, Eye, X } from "lucide-react";
+import { Plus, Trash2, Loader2, ReceiptText, Minus, Printer, Eye, X, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -137,6 +137,10 @@ export default function ReceiptsPage() {
   const [isEmployeeMeal, setIsEmployeeMeal] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState<(Receipt & { items?: ReceiptItem[] }) | null>(null);
 
+  const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "regular" | "meal">("all");
+
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
     queryFn: async () => {
@@ -263,6 +267,33 @@ export default function ReceiptsPage() {
   });
   const todayTotal = todayReceipts.reduce((s, r) => s + parseFloat(r.total), 0);
 
+  const filteredReceipts = allReceipts.filter(r => {
+    const d = new Date(r.date);
+    const now = new Date();
+
+    if (dateFilter === "today") {
+      if (d.toDateString() !== now.toDateString()) return false;
+    } else if (dateFilter === "week") {
+      const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+      if (d < weekAgo) return false;
+    } else if (dateFilter === "month") {
+      const monthAgo = new Date(now); monthAgo.setMonth(now.getMonth() - 1);
+      if (d < monthAgo) return false;
+    }
+
+    if (typeFilter === "regular" && (r as any).isEmployeeMeal) return false;
+    if (typeFilter === "meal" && !(r as any).isEmployeeMeal) return false;
+
+    const q = search.toLowerCase();
+    if (q) {
+      const matchesCashier = r.createdBy.toLowerCase().includes(q);
+      const matchesId = String(r.id).includes(q);
+      if (!matchesCashier && !matchesId) return false;
+    }
+
+    return true;
+  });
+
   return (
     <Layout>
       <div className="flex flex-col gap-8">
@@ -307,6 +338,43 @@ export default function ReceiptsPage() {
               <p className="text-2xl font-mono font-bold" data-testid="text-total-count">{allReceipts.length}</p>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by cashier or receipt #..."
+              className="rounded-none border-muted pl-9"
+              data-testid="input-receipt-search"
+            />
+          </div>
+          <div className="flex gap-1 border border-border p-1">
+            {(["all", "today", "week", "month"] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setDateFilter(f)}
+                data-testid={`filter-date-${f}`}
+                className={`px-3 py-1 text-xs font-mono transition-colors ${dateFilter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {f === "all" ? "All Time" : f === "today" ? "Today" : f === "week" ? "7 Days" : "30 Days"}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1 border border-border p-1">
+            {(["all", "regular", "meal"] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setTypeFilter(f)}
+                data-testid={`filter-type-${f}`}
+                className={`px-3 py-1 text-xs font-mono transition-colors ${typeFilter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {f === "all" ? "All" : f === "regular" ? "Regular" : "Employee Meals"}
+              </button>
+            ))}
+          </div>
         </div>
 
         {showNewReceipt && (
@@ -487,7 +555,13 @@ export default function ReceiptsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {allReceipts.map((receipt) => (
+                {filteredReceipts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No receipts match your filters.
+                    </TableCell>
+                  </TableRow>
+                ) : filteredReceipts.map((receipt) => (
                   <TableRow
                     key={receipt.id}
                     className="cursor-pointer hover:bg-muted/20"
