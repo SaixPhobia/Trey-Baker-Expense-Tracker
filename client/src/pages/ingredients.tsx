@@ -43,13 +43,10 @@ export default function IngredientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
   const [editForm, setEditForm] = useState({ name: "", quantity: "", unit: "kg", costPerUnit: "", category: "Flour" });
-  const [newIngredient, setNewIngredient] = useState({
-    name: "",
-    quantity: "",
-    unit: "kg",
-    costPerUnit: "",
-    category: "Flour"
-  });
+  const [newIngredient, setNewIngredient] = useState({ name: "", quantity: "", unit: "kg", costPerUnit: "", category: "Flour" });
+  const [buyByCase, setBuyByCase] = useState(false);
+  const [caseForm, setCaseForm] = useState({ cases: "", casePrice: "" });
+  const UNITS_PER_CASE = 50;
 
   const { data: ingredients = [], isLoading } = useQuery<Ingredient[]>({
     queryKey: ["/api/ingredients"],
@@ -121,8 +118,25 @@ export default function IngredientsPage() {
   };
 
   const handleAddIngredient = () => {
-    if (!newIngredient.name || !newIngredient.costPerUnit || !newIngredient.quantity) return;
-    createMutation.mutate(newIngredient);
+    if (!newIngredient.name) return;
+    if (buyByCase) {
+      if (!caseForm.cases || !caseForm.casePrice) return;
+      const totalQty = (parseFloat(caseForm.cases) * UNITS_PER_CASE).toString();
+      const costEach = (parseFloat(caseForm.casePrice) / UNITS_PER_CASE).toString();
+      createMutation.mutate({ ...newIngredient, quantity: totalQty, costPerUnit: costEach });
+    } else {
+      if (!newIngredient.costPerUnit || !newIngredient.quantity) return;
+      createMutation.mutate(newIngredient);
+    }
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      setNewIngredient({ name: "", quantity: "", unit: "kg", costPerUnit: "", category: "Flour" });
+      setBuyByCase(false);
+      setCaseForm({ cases: "", casePrice: "" });
+    }
   };
 
   return (
@@ -135,13 +149,13 @@ export default function IngredientsPage() {
               Manage your ingredient inventory and costs. These will appear as quick-select options when adding expenses.
             </p>
           </div>
-          {canManage && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          {canManage && <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
             <DialogTrigger asChild>
               <Button className="gap-2 font-mono text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded-none" data-testid="button-new-ingredient">
                 <Plus className="h-4 w-4" /> New Ingredient
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-none sm:max-w-[425px]">
+            <DialogContent className="rounded-none sm:max-w-[440px]">
               <DialogHeader>
                 <DialogTitle className="font-serif">Add New Ingredient</DialogTitle>
               </DialogHeader>
@@ -157,33 +171,122 @@ export default function IngredientsPage() {
                     className="rounded-none border-muted"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="quantity">Quantity</Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      step="0.01"
-                      data-testid="input-ingredient-quantity"
-                      value={newIngredient.quantity}
-                      onChange={(e) => setNewIngredient({ ...newIngredient, quantity: e.target.value })}
-                      placeholder="0"
-                      className="rounded-none border-muted"
-                    />
+
+                <div className="flex items-center gap-3 p-3 bg-muted/30 border border-border">
+                  <button
+                    type="button"
+                    data-testid="toggle-buy-by-case"
+                    onClick={() => setBuyByCase(false)}
+                    className={`flex-1 py-1.5 text-xs font-mono font-medium transition-colors ${!buyByCase ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    Individual
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="toggle-buy-by-case-on"
+                    onClick={() => setBuyByCase(true)}
+                    className={`flex-1 py-1.5 text-xs font-mono font-medium transition-colors ${buyByCase ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    By Case (50 / case)
+                  </button>
+                </div>
+
+                {buyByCase ? (
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="cases">Number of Cases</Label>
+                        <Input
+                          id="cases"
+                          type="number"
+                          step="1"
+                          min="1"
+                          data-testid="input-ingredient-cases"
+                          value={caseForm.cases}
+                          onChange={(e) => setCaseForm({ ...caseForm, cases: e.target.value })}
+                          placeholder="1"
+                          className="rounded-none border-muted"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="casePrice">Cost per Case ($)</Label>
+                        <Input
+                          id="casePrice"
+                          type="number"
+                          step="0.01"
+                          data-testid="input-ingredient-case-price"
+                          value={caseForm.casePrice}
+                          onChange={(e) => setCaseForm({ ...caseForm, casePrice: e.target.value })}
+                          placeholder="0.00"
+                          className="rounded-none border-muted"
+                        />
+                      </div>
+                    </div>
+                    {caseForm.cases && caseForm.casePrice && (
+                      <div className="bg-secondary/30 border border-border p-3 grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Total Units</p>
+                          <p className="font-mono font-bold text-primary" data-testid="text-case-total-units">
+                            {(parseFloat(caseForm.cases) * UNITS_PER_CASE).toLocaleString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Cost per Unit</p>
+                          <p className="font-mono font-bold text-primary" data-testid="text-case-cost-per-unit">
+                            ${(parseFloat(caseForm.casePrice) / UNITS_PER_CASE).toFixed(4)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="costPerUnit">Cost per Unit ($)</Label>
-                    <Input
-                      id="costPerUnit"
-                      type="number"
-                      step="0.01"
-                      data-testid="input-ingredient-cost"
-                      value={newIngredient.costPerUnit}
-                      onChange={(e) => setNewIngredient({ ...newIngredient, costPerUnit: e.target.value })}
-                      placeholder="0.00"
-                      className="rounded-none border-muted"
-                    />
+                ) : (
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="quantity">Quantity</Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        step="0.01"
+                        data-testid="input-ingredient-quantity"
+                        value={newIngredient.quantity}
+                        onChange={(e) => setNewIngredient({ ...newIngredient, quantity: e.target.value })}
+                        placeholder="0"
+                        className="rounded-none border-muted"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="costPerUnit">Cost per Unit ($)</Label>
+                      <Input
+                        id="costPerUnit"
+                        type="number"
+                        step="0.01"
+                        data-testid="input-ingredient-cost"
+                        value={newIngredient.costPerUnit}
+                        onChange={(e) => setNewIngredient({ ...newIngredient, costPerUnit: e.target.value })}
+                        placeholder="0.00"
+                        className="rounded-none border-muted"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Unit</Label>
+                      <Select
+                        value={newIngredient.unit}
+                        onValueChange={(value) => setNewIngredient({ ...newIngredient, unit: value })}
+                      >
+                        <SelectTrigger className="rounded-none border-muted">
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-none">
+                          {UNITS.map(unit => (
+                            <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+                )}
+
+                {buyByCase && (
                   <div className="grid gap-2">
                     <Label>Unit</Label>
                     <Select
@@ -200,7 +303,8 @@ export default function IngredientsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
+                )}
+
                 <div className="grid gap-2">
                   <Label>Category</Label>
                   <Select
