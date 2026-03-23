@@ -197,6 +197,11 @@ export async function registerRoutes(
     res.json(stock);
   });
 
+  app.get("/api/reports", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const data = await storage.getReports();
+    res.json(data);
+  });
+
   app.get("/api/production/logs", requireAuth, async (req, res) => {
     const logs = await storage.getProductionLogs();
     res.json(logs);

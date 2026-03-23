@@ -72,6 +72,10 @@ export interface IStorage {
 
   getProfileSettings(): Promise<ProfileSettings>;
   updateProfileSettings(settings: Partial<InsertProfileSettings>): Promise<ProfileSettings>;
+  getReports(): Promise<{
+    summary: { totalRevenue: number; totalIngredientCost: number; totalExpenses: number; netProfit: number };
+    receiptRows: { id: number; date: string; createdBy: string; total: string; commission: string }[];
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -348,6 +352,28 @@ export class DatabaseStorage implements IStorage {
       return created;
     }
     return settings;
+  }
+
+  async getReports() {
+    const allReceipts = await db.select().from(receipts).orderBy(desc(receipts.date));
+    const allLogs = await db.select().from(productionLogs);
+    const allExpenseRows = await db.select().from(expenses);
+
+    const totalRevenue = allReceipts.reduce((s, r) => s + parseFloat(r.total), 0);
+    const totalIngredientCost = allLogs.reduce((s, l) => s + parseFloat(l.ingredientCost), 0);
+    const totalExpenses = allExpenseRows.reduce((s, e) => s + parseFloat(e.total), 0);
+    const netProfit = totalRevenue - totalIngredientCost - totalExpenses;
+
+    return {
+      summary: { totalRevenue, totalIngredientCost, totalExpenses, netProfit },
+      receiptRows: allReceipts.map(r => ({
+        id: r.id,
+        date: r.date instanceof Date ? r.date.toISOString() : String(r.date),
+        createdBy: r.createdBy,
+        total: r.total,
+        commission: (parseFloat(r.total) * 0.4).toFixed(2),
+      })),
+    };
   }
 
   async updateProfileSettings(settings: Partial<InsertProfileSettings>): Promise<ProfileSettings> {
