@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Loader2, CakeSlice, Package, X, ChefHat } from "lucide-react";
+import { Plus, Trash2, Loader2, CakeSlice, Package, X, ChefHat, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -356,12 +356,10 @@ export default function MenuItemsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newItem, setNewItem] = useState({
-    name: "",
-    description: "",
-    basePrice: "",
-    category: "Food"
-  });
+  const [newItem, setNewItem] = useState({ name: "", description: "", basePrice: "", category: "Food" });
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editItem, setEditItem] = useState<MenuItem | null>(null);
 
   const { data: menuItems = [], isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
@@ -397,6 +395,27 @@ export default function MenuItemsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
       toast({ title: "Menu Item Deleted", description: "Menu item has been removed.", variant: "destructive" });
     }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (item: MenuItem) => {
+      const res = await fetch(`/api/menu-items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: item.name, description: item.description, basePrice: item.basePrice, category: item.category }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production/logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock"] });
+      setEditOpen(false);
+      setEditItem(null);
+      toast({ title: "Menu Item Updated", description: "Changes saved successfully." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to save changes.", variant: "destructive" }),
   });
 
   const handleAddItem = () => {
@@ -527,15 +546,26 @@ export default function MenuItemsPage() {
                         <IngredientsDialog menuItem={item} canManage={canManage} />
                         {canManage && <LogProductionDialog menuItem={item} />}
                         {canManage && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => deleteMutation.mutate(item.id)}
-                            data-testid={`button-delete-menu-item-${item.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" /> Remove
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-foreground"
+                              onClick={() => { setEditItem({ ...item }); setEditOpen(true); }}
+                              data-testid={`button-edit-menu-item-${item.id}`}
+                            >
+                              <Pencil className="h-4 w-4 mr-1" /> Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => deleteMutation.mutate(item.id)}
+                              data-testid={`button-delete-menu-item-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" /> Remove
+                            </Button>
+                          </div>
                         )}
                       </CardFooter>
                     </Card>
@@ -546,6 +576,79 @@ export default function MenuItemsPage() {
           </div>
         )}
       </div>
+
+      {editItem && (
+        <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) setEditItem(null); }}>
+          <DialogContent className="rounded-none sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="font-serif">Edit Menu Item</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">Name</Label>
+                <Input
+                  id="edit-name"
+                  data-testid="input-edit-menu-item-name"
+                  value={editItem.name}
+                  onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
+                  className="rounded-none border-muted"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-description">Description (optional)</Label>
+                <Textarea
+                  id="edit-description"
+                  data-testid="input-edit-menu-item-description"
+                  value={editItem.description ?? ""}
+                  onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
+                  className="rounded-none border-muted resize-none h-20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-price">Base Price ($)</Label>
+                  <Input
+                    id="edit-price"
+                    type="number"
+                    step="0.01"
+                    data-testid="input-edit-menu-item-price"
+                    value={editItem.basePrice}
+                    onChange={(e) => setEditItem({ ...editItem, basePrice: e.target.value })}
+                    className="rounded-none border-muted"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Category</Label>
+                  <Select
+                    value={editItem.category}
+                    onValueChange={(value) => setEditItem({ ...editItem, category: value })}
+                  >
+                    <SelectTrigger className="rounded-none border-muted">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none">
+                      {MENU_CATEGORIES.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => updateMutation.mutate(editItem)}
+                className="rounded-none w-full"
+                disabled={updateMutation.isPending || !editItem.name || !editItem.basePrice}
+                data-testid="button-save-menu-item-edit"
+              >
+                {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </Layout>
   );
 }
