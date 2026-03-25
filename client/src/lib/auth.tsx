@@ -6,6 +6,7 @@ interface AuthUser {
   username: string;
   displayName: string;
   role: string;
+  isOriginalOwner: boolean;
 }
 
 interface AuthContextType {

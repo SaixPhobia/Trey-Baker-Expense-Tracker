@@ -47,13 +47,14 @@ export function setupAuth(app: Express) {
       }
 
       const userCount = await storage.getUserCount();
-      const role = userCount === 0 ? "Owner" : "Staff";
+      const isFirst = userCount === 0;
+      const role = isFirst ? "Owner" : "Staff";
 
       const user = await storage.createUserWithRole({
         username,
         password,
         displayName: displayName || username,
-      }, role);
+      }, role, isFirst);
 
       (req.session as any).userId = user.id;
 
@@ -62,6 +63,7 @@ export function setupAuth(app: Express) {
         username: user.username,
         displayName: user.displayName,
         role: user.role,
+        isOriginalOwner: user.isOriginalOwner,
       });
     } catch (err: any) {
       console.error("Registration error:", err);
@@ -93,6 +95,7 @@ export function setupAuth(app: Express) {
         username: user.username,
         displayName: user.displayName,
         role: user.role,
+        isOriginalOwner: user.isOriginalOwner,
       });
     } catch (err: any) {
       console.error("Login error:", err);
@@ -126,6 +129,7 @@ export function setupAuth(app: Express) {
       username: user.username,
       displayName: user.displayName,
       role: user.role,
+      isOriginalOwner: user.isOriginalOwner,
     });
   });
 }

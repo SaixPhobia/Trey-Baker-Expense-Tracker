@@ -11,6 +11,7 @@ A business management tool for "Trey Baker" bakery that automates expense report
 - **2026-03-05**: Added menu item ingredient linking - attach ingredients with quantities to menu items, see cost/margin
 - **2026-03-05**: Added receipt system - employees create receipts from menu items, auto-calculated totals with tax, printable receipts
 - **2026-02-07**: Added Orders feature - all team members can submit, Owner/Manager can delete and update status
+- **2026-03-25**: Role changes locked to original account only — `isOriginalOwner` flag on users table; API checks flag (not just role), UI hides dropdown for non-original-owners
 - **2026-02-06**: Added user accounts with role-based access control (Owner, Manager, Staff)
 - **2026-02-06**: First registered user automatically becomes Owner
 - **2026-02-06**: Added login/register pages, session-based auth, team management page

@@ -340,7 +340,12 @@ export async function registerRoutes(
     })));
   });
 
-  app.patch("/api/team/:id/role", requireAuth, requireRole("Owner"), async (req, res) => {
+  app.patch("/api/team/:id/role", requireAuth, async (req, res) => {
+    const userId = (req.session as any).userId;
+    const currentUser = await storage.getUser(userId);
+    if (!currentUser || !currentUser.isOriginalOwner) {
+      return res.status(403).json({ error: "Only the original owner can change roles" });
+    }
     const { role } = req.body;
     if (!["Owner", "Manager", "Staff"].includes(role)) {
       return res.status(400).json({ error: "Invalid role" });

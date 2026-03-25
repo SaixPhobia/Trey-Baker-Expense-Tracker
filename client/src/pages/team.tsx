@@ -230,7 +230,9 @@ export default function TeamPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {isSelf ? (
+                          {!user?.isOriginalOwner ? (
+                            <span className="text-xs text-muted-foreground italic">Only the owner can change roles</span>
+                          ) : isSelf ? (
                             <span className="text-xs text-muted-foreground italic">Can't change own role</span>
                           ) : (
                             <Select

@@ -173,6 +173,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   displayName: text("display_name").notNull().default(""),
   role: text("role").notNull().default("Staff"),
+  isOriginalOwner: boolean("is_original_owner").notNull().default(false),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
