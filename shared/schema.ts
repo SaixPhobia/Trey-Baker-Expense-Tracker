@@ -122,6 +122,27 @@ export const insertProductionLogSchema = createInsertSchema(productionLogs).omit
 export type InsertProductionLog = z.infer<typeof insertProductionLogSchema>;
 export type ProductionLog = typeof productionLogs.$inferSelect;
 
+export const contractOrders = pgTable("contract_orders", {
+  id: serial("id").primaryKey(),
+  companyName: text("company_name").notNull(),
+  contactName: text("contact_name").notNull().default(""),
+  contactPhone: text("contact_phone").notNull().default(""),
+  contactEmail: text("contact_email").notNull().default(""),
+  items: text("items").notNull(),
+  quantityPerDelivery: text("quantity_per_delivery").notNull().default(""),
+  frequency: text("frequency").notNull().default("Weekly"),
+  pricePerDelivery: decimal("price_per_delivery", { precision: 10, scale: 2 }).notNull().default("0"),
+  startDate: timestamp("start_date").notNull().defaultNow(),
+  endDate: timestamp("end_date"),
+  status: text("status").notNull().default("Active"),
+  notes: text("notes").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContractOrderSchema = createInsertSchema(contractOrders).omit({ id: true, createdAt: true });
+export type InsertContractOrder = z.infer<typeof insertContractOrderSchema>;
+export type ContractOrder = typeof contractOrders.$inferSelect;
+
 export const profileSettings = pgTable("profile_settings", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().default("Jean Dupont"),

@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertIngredientSchema, insertMenuItemSchema, insertExpenseSchema, insertExpenseCategorySchema, insertOrderSchema, insertMenuItemIngredientSchema } from "@shared/schema";
+import { insertIngredientSchema, insertMenuItemSchema, insertExpenseSchema, insertExpenseCategorySchema, insertOrderSchema, insertMenuItemIngredientSchema, insertContractOrderSchema } from "@shared/schema";
 import { z } from "zod";
 import { requireAuth, requireRole } from "./auth";
 import bcrypt from "bcryptjs";
@@ -428,6 +428,39 @@ export async function registerRoutes(
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", "attachment; filename=expenses.csv");
     res.send(csv);
+  });
+
+  // ============ CONTRACT ORDERS ============
+  app.get("/api/contracts", requireAuth, async (req, res) => {
+    const contracts = await storage.getContractOrders();
+    res.json(contracts);
+  });
+
+  app.get("/api/contracts/:id", requireAuth, async (req, res) => {
+    const id = getParamId(req);
+    const contract = await storage.getContractOrder(id);
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+    res.json(contract);
+  });
+
+  app.post("/api/contracts", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const parsed = insertContractOrderSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+    const contract = await storage.createContractOrder(parsed.data);
+    res.status(201).json(contract);
+  });
+
+  app.patch("/api/contracts/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
+    const updated = await storage.updateContractOrder(id, req.body);
+    if (!updated) return res.status(404).json({ error: "Contract not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/contracts/:id", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+    const id = getParamId(req);
+    await storage.deleteContractOrder(id);
+    res.status(204).send();
   });
 
   return httpServer;

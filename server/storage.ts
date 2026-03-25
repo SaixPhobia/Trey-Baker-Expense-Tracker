@@ -10,8 +10,9 @@ import {
   type Receipt, type InsertReceipt,
   type ReceiptItem, type InsertReceiptItem,
   type ProductionLog, type InsertProductionLog,
+  type ContractOrder, type InsertContractOrder,
   users, ingredients, menuItems, expenses, expenseCategories, profileSettings, orders,
-  menuItemIngredients, receipts, receiptItems, productionLogs
+  menuItemIngredients, receipts, receiptItems, productionLogs, contractOrders
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -76,6 +77,12 @@ export interface IStorage {
     summary: { totalRevenue: number; totalIngredientCost: number; totalExpenses: number; netProfit: number };
     receiptRows: { id: number; date: string; createdBy: string; total: string; commission: string }[];
   }>;
+
+  getContractOrders(): Promise<ContractOrder[]>;
+  getContractOrder(id: number): Promise<ContractOrder | undefined>;
+  createContractOrder(order: InsertContractOrder): Promise<ContractOrder>;
+  updateContractOrder(id: number, order: Partial<InsertContractOrder>): Promise<ContractOrder | undefined>;
+  deleteContractOrder(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -382,6 +389,30 @@ export class DatabaseStorage implements IStorage {
     const existing = await this.getProfileSettings();
     const [updated] = await db.update(profileSettings).set(settings).where(eq(profileSettings.id, existing.id)).returning();
     return updated;
+  }
+
+  async getContractOrders(): Promise<ContractOrder[]> {
+    return db.select().from(contractOrders).orderBy(desc(contractOrders.createdAt));
+  }
+
+  async getContractOrder(id: number): Promise<ContractOrder | undefined> {
+    const [order] = await db.select().from(contractOrders).where(eq(contractOrders.id, id));
+    return order;
+  }
+
+  async createContractOrder(order: InsertContractOrder): Promise<ContractOrder> {
+    const [created] = await db.insert(contractOrders).values(order).returning();
+    return created;
+  }
+
+  async updateContractOrder(id: number, order: Partial<InsertContractOrder>): Promise<ContractOrder | undefined> {
+    const [updated] = await db.update(contractOrders).set(order).where(eq(contractOrders.id, id)).returning();
+    return updated;
+  }
+
+  async deleteContractOrder(id: number): Promise<boolean> {
+    await db.delete(contractOrders).where(eq(contractOrders.id, id));
+    return true;
   }
 }
 
