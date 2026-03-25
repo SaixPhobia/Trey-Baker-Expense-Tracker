@@ -266,7 +266,7 @@ export function ExpenseTable() {
         </Dialog>
       </div>
 
-      <div className="border border-border rounded-none overflow-hidden bg-card shadow-sm">
+      <div className="border border-border rounded-none overflow-x-auto bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">

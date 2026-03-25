@@ -313,7 +313,7 @@ export default function ProductionPage() {
 
         {/* ── STOCK TAB ── */}
         <TabsContent value="stock">
-          <div className="border border-border" data-testid="current-stock">
+          <div className="border border-border overflow-x-auto" data-testid="current-stock">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div className="flex items-center gap-2">
                 <PackageCheck className="h-4 w-4 text-muted-foreground" />
@@ -380,7 +380,7 @@ export default function ProductionPage() {
 
         {/* ── HISTORY TAB ── */}
         <TabsContent value="history">
-          <div className="border border-border">
+          <div className="border border-border overflow-x-auto">
             <div className="flex items-center gap-2 px-6 py-4 border-b border-border">
               <History className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Production History</h2>

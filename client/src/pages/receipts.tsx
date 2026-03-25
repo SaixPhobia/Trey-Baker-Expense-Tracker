@@ -542,7 +542,7 @@ export default function ReceiptsPage() {
             <p>No receipts yet. Click "New Receipt" to create your first sale.</p>
           </div>
         ) : allReceipts.length > 0 && (
-          <div className="border border-border">
+          <div className="border border-border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
