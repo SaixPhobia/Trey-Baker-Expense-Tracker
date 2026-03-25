@@ -4,10 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Loader2, FileSignature, Pencil, Phone, Mail, User, Calendar, RefreshCw, X } from "lucide-react";
+import { Plus, Trash2, Loader2, FileSignature, Pencil, Phone, Mail, User, Calendar, RefreshCw, X, PenLine } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { MenuItem } from "@shared/schema";
+import { SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -54,9 +56,10 @@ export interface LineItem {
   name: string;
   qty: string;
   unitPrice: string;
+  menuItemId: string;
 }
 
-const EMPTY_LINE_ITEM: LineItem = { name: "", qty: "", unitPrice: "" };
+const EMPTY_LINE_ITEM: LineItem = { name: "", qty: "", unitPrice: "", menuItemId: "" };
 
 const EMPTY_FORM = {
   companyName: "",
@@ -89,7 +92,14 @@ function calcTotal(lineItems: LineItem[], deliveryFee: string) {
 function parseLineItems(raw: string): LineItem[] {
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map((li: any) => ({
+        name: li.name ?? "",
+        qty: li.qty ?? "",
+        unitPrice: li.unitPrice ?? "",
+        menuItemId: li.menuItemId ?? "",
+      }));
+    }
   } catch {}
   return [{ ...EMPTY_LINE_ITEM }];
 }
@@ -110,11 +120,42 @@ function ContractForm({
   const [form, setForm] = useState(initial);
   const set = (k: keyof FormState, v: any) => setForm(f => ({ ...f, [k]: v }));
 
+  const { data: menuItems = [] } = useQuery<MenuItem[]>({
+    queryKey: ["/api/menu-items"],
+    queryFn: async () => {
+      const res = await fetch("/api/menu-items");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const menuCategories = Array.from(new Set(menuItems.map(m => m.category))).sort();
+
   const updateLineItem = (index: number, field: keyof LineItem, value: string) => {
     setForm(f => {
       const updated = f.lineItems.map((li, i) => i === index ? { ...li, [field]: value } : li);
       return { ...f, lineItems: updated };
     });
+  };
+
+  const selectMenuItem = (index: number, value: string) => {
+    if (value === "__custom__") {
+      setForm(f => {
+        const updated = f.lineItems.map((li, i) =>
+          i === index ? { ...li, menuItemId: "__custom__", name: "", unitPrice: "" } : li
+        );
+        return { ...f, lineItems: updated };
+      });
+    } else {
+      const item = menuItems.find(m => String(m.id) === value);
+      if (!item) return;
+      setForm(f => {
+        const updated = f.lineItems.map((li, i) =>
+          i === index ? { ...li, menuItemId: value, name: item.name, unitPrice: parseFloat(item.basePrice).toFixed(2) } : li
+        );
+        return { ...f, lineItems: updated };
+      });
+    }
   };
 
   const addLineItem = () => setForm(f => ({ ...f, lineItems: [...f.lineItems, { ...EMPTY_LINE_ITEM }] }));
@@ -134,7 +175,7 @@ function ContractForm({
   };
 
   return (
-    <DialogContent className="rounded-none sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
+    <DialogContent className="rounded-none sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="font-serif">{title}</DialogTitle>
       </DialogHeader>
@@ -187,54 +228,95 @@ function ContractForm({
         <div className="grid gap-2">
           <Label>Items per Delivery *</Label>
           <div className="border border-border">
-            <div className="grid grid-cols-[1fr_60px_80px_70px_32px] gap-0 bg-muted/30 px-3 py-2 text-xs font-mono text-muted-foreground uppercase tracking-wider">
-              <span>Item</span>
+            <div className="grid grid-cols-[1fr_60px_84px_70px_32px] gap-0 bg-muted/30 px-2 py-2 text-xs font-mono text-muted-foreground uppercase tracking-wider border-b border-border">
+              <span className="pl-1">Item</span>
               <span className="text-center">Qty</span>
-              <span className="text-right">Unit Price</span>
-              <span className="text-right">Total</span>
+              <span className="text-right pr-2">Unit Price</span>
+              <span className="text-right pr-2">Total</span>
               <span />
             </div>
             {form.lineItems.map((li, i) => {
               const rowTotal = (parseFloat(li.qty) || 0) * (parseFloat(li.unitPrice) || 0);
+              const isCustom = li.menuItemId === "__custom__" || li.menuItemId === "";
               return (
-                <div key={i} className="grid grid-cols-[1fr_60px_80px_70px_32px] gap-0 border-t border-border" data-testid={`line-item-row-${i}`}>
-                  <Input
-                    value={li.name}
-                    onChange={e => updateLineItem(i, "name", e.target.value)}
-                    placeholder="Item name"
-                    className="rounded-none border-0 border-r border-border h-9 text-sm focus-visible:ring-0"
-                    data-testid={`input-line-item-name-${i}`}
-                  />
-                  <Input
-                    type="number"
-                    min="0"
-                    value={li.qty}
-                    onChange={e => updateLineItem(i, "qty", e.target.value)}
-                    placeholder="0"
-                    className="rounded-none border-0 border-r border-border h-9 text-sm text-center focus-visible:ring-0"
-                    data-testid={`input-line-item-qty-${i}`}
-                  />
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={li.unitPrice}
-                    onChange={e => updateLineItem(i, "unitPrice", e.target.value)}
-                    placeholder="0.00"
-                    className="rounded-none border-0 border-r border-border h-9 text-sm text-right focus-visible:ring-0"
-                    data-testid={`input-line-item-price-${i}`}
-                  />
-                  <div className="flex items-center justify-end px-2 border-r border-border text-sm font-mono text-muted-foreground">
-                    {rowTotal > 0 ? `$${rowTotal.toFixed(2)}` : "—"}
+                <div key={i} className="border-t border-border first:border-t-0" data-testid={`line-item-row-${i}`}>
+                  <div className="grid grid-cols-[1fr_60px_84px_70px_32px] gap-0">
+                    <div className="border-r border-border">
+                      <Select
+                        value={li.menuItemId || ""}
+                        onValueChange={v => selectMenuItem(i, v)}
+                      >
+                        <SelectTrigger
+                          className="rounded-none border-0 h-9 text-sm focus:ring-0 focus-visible:ring-0 shadow-none px-2"
+                          data-testid={`select-line-item-menu-${i}`}
+                        >
+                          <SelectValue placeholder="Choose item…" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-none">
+                          <SelectItem value="__custom__">
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <PenLine className="h-3 w-3" /> Custom item…
+                            </span>
+                          </SelectItem>
+                          <SelectSeparator />
+                          {menuCategories.map(cat => (
+                            <SelectGroup key={cat}>
+                              <SelectLabel className="text-xs uppercase tracking-wider text-muted-foreground font-mono">{cat}</SelectLabel>
+                              {menuItems.filter(m => m.category === cat).map(m => (
+                                <SelectItem key={m.id} value={String(m.id)}>
+                                  <span className="flex items-center justify-between gap-4 w-full">
+                                    <span>{m.name}</span>
+                                    <span className="text-xs text-muted-foreground font-mono">${parseFloat(m.basePrice).toFixed(2)}</span>
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={li.qty}
+                      onChange={e => updateLineItem(i, "qty", e.target.value)}
+                      placeholder="0"
+                      className="rounded-none border-0 border-r border-border h-9 text-sm text-center focus-visible:ring-0"
+                      data-testid={`input-line-item-qty-${i}`}
+                    />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={li.unitPrice}
+                      onChange={e => updateLineItem(i, "unitPrice", e.target.value)}
+                      placeholder="0.00"
+                      className="rounded-none border-0 border-r border-border h-9 text-sm text-right focus-visible:ring-0"
+                      data-testid={`input-line-item-price-${i}`}
+                    />
+                    <div className="flex items-center justify-end px-2 border-r border-border text-sm font-mono text-muted-foreground">
+                      {rowTotal > 0 ? `$${rowTotal.toFixed(2)}` : "—"}
+                    </div>
+                    <button
+                      onClick={() => removeLineItem(i)}
+                      disabled={form.lineItems.length === 1}
+                      className="flex items-center justify-center text-muted-foreground hover:text-destructive disabled:opacity-30 transition-colors"
+                      data-testid={`button-remove-line-item-${i}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => removeLineItem(i)}
-                    disabled={form.lineItems.length === 1}
-                    className="flex items-center justify-center text-muted-foreground hover:text-destructive disabled:opacity-30 transition-colors"
-                    data-testid={`button-remove-line-item-${i}`}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                  {isCustom && (
+                    <div className="border-t border-border/50 px-2 py-1.5 bg-muted/10">
+                      <Input
+                        value={li.name}
+                        onChange={e => updateLineItem(i, "name", e.target.value)}
+                        placeholder="Type custom item name…"
+                        className="rounded-none border-muted h-8 text-sm focus-visible:ring-0"
+                        data-testid={`input-line-item-name-${i}`}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
