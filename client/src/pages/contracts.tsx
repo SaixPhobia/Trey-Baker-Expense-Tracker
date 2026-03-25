@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Loader2, FileSignature, Pencil, Phone, Mail, User, Calendar, RefreshCw, DollarSign, X } from "lucide-react";
+import { Plus, Trash2, Loader2, FileSignature, Pencil, Phone, Mail, User, Calendar, RefreshCw, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -41,15 +41,31 @@ const STATUS_COLORS: Record<string, string> = {
   Cancelled: "bg-red-100 text-red-800",
 };
 
+const FREQ_MULTIPLIERS: Record<string, number> = {
+  Weekly: 4,
+  "Bi-weekly": 2,
+  Monthly: 1,
+  "Bi-monthly": 0.5,
+  Quarterly: 0.33,
+  "One-time": 0,
+};
+
+export interface LineItem {
+  name: string;
+  qty: string;
+  unitPrice: string;
+}
+
+const EMPTY_LINE_ITEM: LineItem = { name: "", qty: "", unitPrice: "" };
+
 const EMPTY_FORM = {
   companyName: "",
   contactName: "",
   contactPhone: "",
   contactEmail: "",
-  items: "",
-  quantityPerDelivery: "",
+  lineItems: [{ ...EMPTY_LINE_ITEM }] as LineItem[],
+  deliveryFee: "",
   frequency: "Weekly",
-  pricePerDelivery: "",
   startDate: new Date().toISOString().split("T")[0],
   endDate: "",
   status: "Active",
@@ -57,6 +73,26 @@ const EMPTY_FORM = {
 };
 
 type FormState = typeof EMPTY_FORM;
+
+function calcSubtotal(lineItems: LineItem[]) {
+  return lineItems.reduce((sum, li) => {
+    const qty = parseFloat(li.qty) || 0;
+    const price = parseFloat(li.unitPrice) || 0;
+    return sum + qty * price;
+  }, 0);
+}
+
+function calcTotal(lineItems: LineItem[], deliveryFee: string) {
+  return calcSubtotal(lineItems) + (parseFloat(deliveryFee) || 0);
+}
+
+function parseLineItems(raw: string): LineItem[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch {}
+  return [{ ...EMPTY_LINE_ITEM }];
+}
 
 function ContractForm({
   initial,
@@ -72,10 +108,33 @@ function ContractForm({
   title: string;
 }) {
   const [form, setForm] = useState(initial);
-  const set = (k: keyof FormState, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: keyof FormState, v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  const updateLineItem = (index: number, field: keyof LineItem, value: string) => {
+    setForm(f => {
+      const updated = f.lineItems.map((li, i) => i === index ? { ...li, [field]: value } : li);
+      return { ...f, lineItems: updated };
+    });
+  };
+
+  const addLineItem = () => setForm(f => ({ ...f, lineItems: [...f.lineItems, { ...EMPTY_LINE_ITEM }] }));
+
+  const removeLineItem = (index: number) =>
+    setForm(f => ({ ...f, lineItems: f.lineItems.filter((_, i) => i !== index) }));
+
+  const subtotal = calcSubtotal(form.lineItems);
+  const fee = parseFloat(form.deliveryFee) || 0;
+  const total = subtotal + fee;
+  const totalQty = form.lineItems.reduce((s, li) => s + (parseFloat(li.qty) || 0), 0);
+
+  const canSave = form.companyName.trim() && form.lineItems.some(li => li.name.trim());
+
+  const handleSave = () => {
+    onSave({ ...form, lineItems: form.lineItems.filter(li => li.name.trim()) });
+  };
 
   return (
-    <DialogContent className="rounded-none sm:max-w-[580px] max-h-[90vh] overflow-y-auto">
+    <DialogContent className="rounded-none sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="font-serif">{title}</DialogTitle>
       </DialogHeader>
@@ -126,28 +185,103 @@ function ContractForm({
         </div>
 
         <div className="grid gap-2">
-          <Label>Items / Products *</Label>
-          <Textarea
-            data-testid="input-contract-items"
-            value={form.items}
-            onChange={e => set("items", e.target.value)}
-            placeholder="e.g. 30 sourdough loaves, 20 croissants, 10 baguettes"
-            className="rounded-none border-muted resize-none h-20"
-          />
+          <Label>Items per Delivery *</Label>
+          <div className="border border-border">
+            <div className="grid grid-cols-[1fr_60px_80px_70px_32px] gap-0 bg-muted/30 px-3 py-2 text-xs font-mono text-muted-foreground uppercase tracking-wider">
+              <span>Item</span>
+              <span className="text-center">Qty</span>
+              <span className="text-right">Unit Price</span>
+              <span className="text-right">Total</span>
+              <span />
+            </div>
+            {form.lineItems.map((li, i) => {
+              const rowTotal = (parseFloat(li.qty) || 0) * (parseFloat(li.unitPrice) || 0);
+              return (
+                <div key={i} className="grid grid-cols-[1fr_60px_80px_70px_32px] gap-0 border-t border-border" data-testid={`line-item-row-${i}`}>
+                  <Input
+                    value={li.name}
+                    onChange={e => updateLineItem(i, "name", e.target.value)}
+                    placeholder="Item name"
+                    className="rounded-none border-0 border-r border-border h-9 text-sm focus-visible:ring-0"
+                    data-testid={`input-line-item-name-${i}`}
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    value={li.qty}
+                    onChange={e => updateLineItem(i, "qty", e.target.value)}
+                    placeholder="0"
+                    className="rounded-none border-0 border-r border-border h-9 text-sm text-center focus-visible:ring-0"
+                    data-testid={`input-line-item-qty-${i}`}
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={li.unitPrice}
+                    onChange={e => updateLineItem(i, "unitPrice", e.target.value)}
+                    placeholder="0.00"
+                    className="rounded-none border-0 border-r border-border h-9 text-sm text-right focus-visible:ring-0"
+                    data-testid={`input-line-item-price-${i}`}
+                  />
+                  <div className="flex items-center justify-end px-2 border-r border-border text-sm font-mono text-muted-foreground">
+                    {rowTotal > 0 ? `$${rowTotal.toFixed(2)}` : "—"}
+                  </div>
+                  <button
+                    onClick={() => removeLineItem(i)}
+                    disabled={form.lineItems.length === 1}
+                    className="flex items-center justify-center text-muted-foreground hover:text-destructive disabled:opacity-30 transition-colors"
+                    data-testid={`button-remove-line-item-${i}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+            <div className="border-t border-border px-3 py-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={addLineItem}
+                className="rounded-none h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                data-testid="button-add-line-item"
+              >
+                <Plus className="h-3 w-3" /> Add Item
+              </Button>
+            </div>
+          </div>
+
+          <div className="bg-muted/20 border border-border p-3 space-y-1.5">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal ({totalQty > 0 ? `${totalQty} items` : "—"})</span>
+              <span className="font-mono">${subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm text-muted-foreground shrink-0">Delivery Fee (optional)</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.deliveryFee}
+                  onChange={e => set("deliveryFee", e.target.value)}
+                  placeholder="0.00"
+                  className="rounded-none border-muted h-7 text-sm w-24 text-right"
+                  data-testid="input-contract-delivery-fee"
+                />
+              </div>
+            </div>
+            <div className="flex justify-between text-sm font-bold border-t border-border pt-1.5">
+              <span>Total per Delivery</span>
+              <span className="font-mono text-primary">${total.toFixed(2)}</span>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="grid gap-2 col-span-2">
-            <Label>Quantity per Delivery</Label>
-            <Input
-              data-testid="input-contract-quantity"
-              value={form.quantityPerDelivery}
-              onChange={e => set("quantityPerDelivery", e.target.value)}
-              placeholder="e.g. 50 units total"
-              className="rounded-none border-muted"
-            />
-          </div>
-          <div className="grid gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="grid gap-2 col-span-2 sm:col-span-1">
             <Label>Frequency</Label>
             <Select value={form.frequency} onValueChange={v => set("frequency", v)}>
               <SelectTrigger className="rounded-none border-muted">
@@ -158,21 +292,6 @@ function ContractForm({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-2">
-            <Label>Price / Delivery ($)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              data-testid="input-contract-price"
-              value={form.pricePerDelivery}
-              onChange={e => set("pricePerDelivery", e.target.value)}
-              placeholder="0.00"
-              className="rounded-none border-muted"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div className="grid gap-2">
             <Label>Start Date</Label>
             <Input
@@ -193,6 +312,9 @@ function ContractForm({
               className="rounded-none border-muted"
             />
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
             <Label>Status</Label>
             <Select value={form.status} onValueChange={v => set("status", v)}>
@@ -221,8 +343,8 @@ function ContractForm({
       <DialogFooter className="gap-2">
         <Button variant="outline" onClick={onCancel} className="rounded-none">Cancel</Button>
         <Button
-          onClick={() => onSave(form)}
-          disabled={isPending || !form.companyName || !form.items}
+          onClick={handleSave}
+          disabled={isPending || !canSave}
           className="rounded-none"
           data-testid="button-save-contract"
         >
@@ -235,19 +357,45 @@ function ContractForm({
 }
 
 function contractToForm(c: ContractOrder): FormState {
+  const lineItems = parseLineItems(c.lineItems ?? "[]");
   return {
     companyName: c.companyName,
     contactName: c.contactName,
     contactPhone: c.contactPhone,
     contactEmail: c.contactEmail,
-    items: c.items,
-    quantityPerDelivery: c.quantityPerDelivery,
+    lineItems,
+    deliveryFee: parseFloat(c.deliveryFee ?? "0") > 0 ? parseFloat(c.deliveryFee ?? "0").toString() : "",
     frequency: c.frequency,
-    pricePerDelivery: parseFloat(c.pricePerDelivery).toString(),
     startDate: new Date(c.startDate).toISOString().split("T")[0],
     endDate: c.endDate ? new Date(c.endDate).toISOString().split("T")[0] : "",
     status: c.status,
     notes: c.notes,
+  };
+}
+
+function formToPayload(form: FormState) {
+  const validItems = form.lineItems.filter(li => li.name.trim());
+  const autoItems = validItems.map(li => `${li.qty ? `${li.qty}x ` : ""}${li.name}`).join(", ");
+  const totalQty = validItems.reduce((s, li) => s + (parseFloat(li.qty) || 0), 0);
+  const subtotal = calcSubtotal(validItems);
+  const fee = parseFloat(form.deliveryFee) || 0;
+  const total = subtotal + fee;
+
+  return {
+    companyName: form.companyName,
+    contactName: form.contactName,
+    contactPhone: form.contactPhone,
+    contactEmail: form.contactEmail,
+    items: autoItems || form.companyName,
+    quantityPerDelivery: totalQty > 0 ? String(totalQty) : "",
+    lineItems: JSON.stringify(validItems),
+    frequency: form.frequency,
+    pricePerDelivery: total.toFixed(2),
+    deliveryFee: fee.toFixed(2),
+    startDate: form.startDate ? new Date(form.startDate).toISOString() : new Date().toISOString(),
+    endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
+    status: form.status,
+    notes: form.notes,
   };
 }
 
@@ -275,12 +423,7 @@ export default function ContractsPage() {
       const res = await fetch("/api/contracts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          pricePerDelivery: form.pricePerDelivery || "0",
-          startDate: form.startDate ? new Date(form.startDate).toISOString() : new Date().toISOString(),
-          endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
-        }),
+        body: JSON.stringify(formToPayload(form)),
       });
       if (!res.ok) throw new Error("Failed to create");
       return res.json();
@@ -298,12 +441,7 @@ export default function ContractsPage() {
       const res = await fetch(`/api/contracts/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          pricePerDelivery: form.pricePerDelivery || "0",
-          startDate: form.startDate ? new Date(form.startDate).toISOString() : new Date().toISOString(),
-          endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
-        }),
+        body: JSON.stringify(formToPayload(form)),
       });
       if (!res.ok) throw new Error("Failed to update");
       return res.json();
@@ -332,8 +470,7 @@ export default function ContractsPage() {
     .filter(c => c.status === "Active")
     .reduce((sum, c) => {
       const price = parseFloat(c.pricePerDelivery);
-      const multipliers: Record<string, number> = { Weekly: 4, "Bi-weekly": 2, Monthly: 1, "Bi-monthly": 0.5, Quarterly: 0.33, "One-time": 0 };
-      return sum + price * (multipliers[c.frequency] ?? 1);
+      return sum + price * (FREQ_MULTIPLIERS[c.frequency] ?? 1);
     }, 0);
 
   return (
@@ -384,7 +521,7 @@ export default function ContractsPage() {
           </Card>
         </div>
 
-        <div className="flex gap-1 border border-border p-1 self-start">
+        <div className="flex gap-1 border border-border p-1 self-start flex-wrap">
           {(["All", ...STATUSES] as string[]).map(s => (
             <button
               key={s}
@@ -408,103 +545,158 @@ export default function ContractsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filtered.map(contract => (
-              <Card key={contract.id} className="rounded-none border-none shadow-sm" data-testid={`card-contract-${contract.id}`}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <CardTitle className="font-serif text-lg">{contract.companyName}</CardTitle>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        <Badge className={`rounded-none text-xs font-mono ${STATUS_COLORS[contract.status] ?? "bg-muted text-foreground"}`}>
-                          {contract.status}
-                        </Badge>
-                        <Badge variant="outline" className="rounded-none text-xs font-mono gap-1">
-                          <RefreshCw className="h-3 w-3" /> {contract.frequency}
-                        </Badge>
-                      </div>
-                    </div>
-                    {canManage && (
-                      <div className="flex gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                          onClick={() => setEditContract(contract)}
-                          data-testid={`button-edit-contract-${contract.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          onClick={() => deleteMutation.mutate(contract.id)}
-                          data-testid={`button-delete-contract-${contract.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="bg-muted/20 p-3 border-l-2 border-primary">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Products</p>
-                    <p className="text-sm">{contract.items}</p>
-                    {contract.quantityPerDelivery && (
-                      <p className="text-xs text-muted-foreground mt-1">Qty: {contract.quantityPerDelivery}</p>
-                    )}
-                  </div>
+            {filtered.map(contract => {
+              const lineItems = parseLineItems(contract.lineItems ?? "[]");
+              const hasStructured = lineItems.some(li => li.name);
+              const subtotal = calcSubtotal(lineItems);
+              const fee = parseFloat(contract.deliveryFee ?? "0");
+              const total = parseFloat(contract.pricePerDelivery);
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Price / Delivery</p>
-                      <p className="font-mono font-bold text-primary">${parseFloat(contract.pricePerDelivery).toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Start Date</p>
-                      <p className="font-mono text-sm">{new Date(contract.startDate).toLocaleDateString()}</p>
-                    </div>
-                    {contract.endDate && (
+              return (
+                <Card key={contract.id} className="rounded-none border-none shadow-sm" data-testid={`card-contract-${contract.id}`}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">End Date</p>
-                        <p className="font-mono text-sm">{new Date(contract.endDate).toLocaleDateString()}</p>
+                        <CardTitle className="font-serif text-lg">{contract.companyName}</CardTitle>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          <Badge className={`rounded-none text-xs font-mono ${STATUS_COLORS[contract.status] ?? "bg-muted text-foreground"}`}>
+                            {contract.status}
+                          </Badge>
+                          <Badge variant="outline" className="rounded-none text-xs font-mono gap-1">
+                            <RefreshCw className="h-3 w-3" /> {contract.frequency}
+                          </Badge>
+                        </div>
+                      </div>
+                      {canManage && (
+                        <div className="flex gap-1 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => setEditContract(contract)}
+                            data-testid={`button-edit-contract-${contract.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            onClick={() => deleteMutation.mutate(contract.id)}
+                            data-testid={`button-delete-contract-${contract.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="bg-muted/20 border-l-2 border-primary">
+                      <div className="px-3 pt-2 pb-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Products per Delivery</p>
+                      </div>
+                      {hasStructured ? (
+                        <>
+                          <div className="grid grid-cols-[1fr_40px_70px_70px] text-xs font-mono text-muted-foreground px-3 pb-1 gap-2">
+                            <span>Item</span>
+                            <span className="text-center">Qty</span>
+                            <span className="text-right">Unit $</span>
+                            <span className="text-right">Total</span>
+                          </div>
+                          {lineItems.filter(li => li.name).map((li, i) => {
+                            const row = (parseFloat(li.qty) || 0) * (parseFloat(li.unitPrice) || 0);
+                            return (
+                              <div key={i} className="grid grid-cols-[1fr_40px_70px_70px] text-sm px-3 py-1 gap-2 border-t border-border/50" data-testid={`card-line-item-${contract.id}-${i}`}>
+                                <span className="truncate">{li.name}</span>
+                                <span className="text-center font-mono text-muted-foreground">{li.qty || "—"}</span>
+                                <span className="text-right font-mono text-muted-foreground">{li.unitPrice ? `$${parseFloat(li.unitPrice).toFixed(2)}` : "—"}</span>
+                                <span className="text-right font-mono">{row > 0 ? `$${row.toFixed(2)}` : "—"}</span>
+                              </div>
+                            );
+                          })}
+                          <div className="px-3 pt-2 pb-2 border-t border-border space-y-1">
+                            {subtotal > 0 && fee > 0 && (
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Subtotal</span>
+                                <span className="font-mono">${subtotal.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {fee > 0 && (
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Delivery Fee</span>
+                                <span className="font-mono">${fee.toFixed(2)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-sm font-bold">
+                              <span>Total / Delivery</span>
+                              <span className="font-mono text-primary">${total.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="px-3 pb-3">
+                          <p className="text-sm">{contract.items}</p>
+                          {contract.quantityPerDelivery && (
+                            <p className="text-xs text-muted-foreground mt-1">Qty: {contract.quantityPerDelivery}</p>
+                          )}
+                          <p className="font-mono font-bold text-primary mt-2">${total.toFixed(2)} / delivery</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Start Date</p>
+                        <p className="font-mono text-sm flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          {new Date(contract.startDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {contract.endDate && (
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">End Date</p>
+                          <p className="font-mono text-sm flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            {new Date(contract.endDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {(contract.contactName || contract.contactPhone || contract.contactEmail) && (
+                      <div className="border-t border-border pt-3 space-y-1">
+                        {contract.contactName && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <User className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span>{contract.contactName}</span>
+                          </div>
+                        )}
+                        {contract.contactPhone && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="font-mono">{contract.contactPhone}</span>
+                          </div>
+                        )}
+                        {contract.contactEmail && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span>{contract.contactEmail}</span>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
 
-                  {(contract.contactName || contract.contactPhone || contract.contactEmail) && (
-                    <div className="border-t border-border pt-3 space-y-1">
-                      {contract.contactName && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <User className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span>{contract.contactName}</span>
-                        </div>
-                      )}
-                      {contract.contactPhone && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="font-mono">{contract.contactPhone}</span>
-                        </div>
-                      )}
-                      {contract.contactEmail && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span>{contract.contactEmail}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {contract.notes && (
-                    <div className="border-t border-border pt-3">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Notes</p>
-                      <p className="text-sm text-muted-foreground">{contract.notes}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                    {contract.notes && (
+                      <div className="border-t border-border pt-3">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Notes</p>
+                        <p className="text-sm text-muted-foreground">{contract.notes}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
