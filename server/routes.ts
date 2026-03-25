@@ -271,6 +271,7 @@ export async function registerRoutes(
         unitPrice: z.string(),
       })),
       isEmployeeMeal: z.boolean().optional().default(false),
+      discountPercent: z.number().min(0).max(100).optional().default(0),
     });
     const parsed = bodySchema.safeParse(req.body);
     if (!parsed.success) {
@@ -294,11 +295,14 @@ export async function registerRoutes(
     });
     const subtotal = serverItems.reduce((s, i) => s + parseFloat(i.lineTotal), 0);
     const isEmployeeMeal = parsed.data.isEmployeeMeal ?? false;
-    const total = isEmployeeMeal ? 0 : subtotal;
+    const discountPercent = parsed.data.discountPercent ?? 0;
+    const discountAmount = subtotal * (discountPercent / 100);
+    const total = isEmployeeMeal ? 0 : subtotal - discountAmount;
 
     const receipt = await storage.createReceipt({
       subtotal: subtotal.toFixed(2),
       tax: "0.00",
+      discountPercent: discountPercent.toFixed(2),
       total: total.toFixed(2),
       createdBy,
       status: "Completed",

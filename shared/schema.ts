@@ -83,6 +83,7 @@ export const receipts = pgTable("receipts", {
   date: timestamp("date").notNull().defaultNow(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
   tax: decimal("tax", { precision: 10, scale: 2 }).notNull().default("0"),
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }).notNull().default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0"),
   createdBy: text("created_by").notNull().default(""),
   status: text("status").notNull().default("Completed"),

@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Loader2, ReceiptText, Minus, Printer, Eye, X, Search } from "lucide-react";
+import { Plus, Trash2, Loader2, ReceiptText, Minus, Printer, Eye, X, Search, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -107,9 +107,19 @@ function ReceiptViewDialog({ receipt, onClose }: { receipt: (Receipt & { items?:
           </div>
           <div style={{ borderTop: "1px dashed #ccc", margin: "12px 0" }} />
           <div className="space-y-1">
-            <div className="flex justify-between font-bold text-base">
+            <div className="flex justify-between text-sm" style={{ color: "#666" }}>
+              <span>Subtotal</span>
+              <span style={{ fontFamily: "monospace" }}>${parseFloat(receipt.subtotal).toFixed(2)}</span>
+            </div>
+            {parseFloat((receipt as any).discountPercent ?? "0") > 0 && (
+              <div className="flex justify-between text-sm" style={{ color: "#c00" }}>
+                <span>Discount ({parseFloat((receipt as any).discountPercent).toFixed(0)}% off)</span>
+                <span style={{ fontFamily: "monospace" }}>−${(parseFloat(receipt.subtotal) * parseFloat((receipt as any).discountPercent) / 100).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold text-base" style={{ borderTop: "1px dashed #ccc", paddingTop: "6px", marginTop: "4px" }}>
               <span>Total</span>
-              <span className="font-mono">${parseFloat(receipt.total).toFixed(2)}</span>
+              <span style={{ fontFamily: "monospace" }}>${parseFloat(receipt.total).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -135,6 +145,7 @@ export default function ReceiptsPage() {
   const [customName, setCustomName] = useState("");
   const [customPrice, setCustomPrice] = useState("");
   const [isEmployeeMeal, setIsEmployeeMeal] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState("");
   const [viewingReceipt, setViewingReceipt] = useState<(Receipt & { items?: ReceiptItem[] }) | null>(null);
 
   const [search, setSearch] = useState("");
@@ -245,7 +256,9 @@ export default function ReceiptsPage() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.lineTotal, 0);
-  const total = isEmployeeMeal ? 0 : subtotal;
+  const discountPct = Math.min(100, Math.max(0, parseFloat(discountPercent) || 0));
+  const discountAmount = subtotal * (discountPct / 100);
+  const total = isEmployeeMeal ? 0 : subtotal - discountAmount;
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
@@ -257,6 +270,7 @@ export default function ReceiptsPage() {
         unitPrice: i.unitPrice.toFixed(2),
       })),
       isEmployeeMeal,
+      discountPercent: discountPct,
     } as any);
   };
 
@@ -382,7 +396,7 @@ export default function ReceiptsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="font-serif">New Receipt</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => { setShowNewReceipt(false); setCart([]); setIsEmployeeMeal(false); }}>
+                <Button variant="ghost" size="sm" onClick={() => { setShowNewReceipt(false); setCart([]); setIsEmployeeMeal(false); setDiscountPercent(""); }}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -502,17 +516,44 @@ export default function ReceiptsPage() {
                       ))}
                     </TableBody>
                   </Table>
-                  <div className="p-4 bg-muted/10 border-t border-border space-y-1">
-                    {isEmployeeMeal && (
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Subtotal</span>
-                        <span className="font-mono line-through">${subtotal.toFixed(2)}</span>
+                  <div className="p-4 bg-muted/10 border-t border-border space-y-2">
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span className="font-mono">${subtotal.toFixed(2)}</span>
+                    </div>
+
+                    {!isEmployeeMeal && (
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground shrink-0">
+                          <Tag className="h-3.5 w-3.5" />
+                          <span>Discount</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={discountPercent}
+                            onChange={e => setDiscountPercent(e.target.value)}
+                            placeholder="0"
+                            className="rounded-none border-muted h-7 text-sm w-16 text-right"
+                            data-testid="input-discount-percent"
+                          />
+                          <span className="text-sm text-muted-foreground">%</span>
+                          {discountAmount > 0 && (
+                            <span className="font-mono text-sm text-red-600">−${discountAmount.toFixed(2)}</span>
+                          )}
+                        </div>
                       </div>
                     )}
-                    <div className="flex justify-between text-lg font-bold">
+
+                    <div className="flex justify-between text-lg font-bold border-t border-border pt-2">
                       <span>Total</span>
                       <span className="font-mono text-primary" data-testid="text-total">
-                        {isEmployeeMeal ? <span className="text-green-700">$0.00 <span className="text-xs font-normal">(Employee Meal)</span></span> : `$${total.toFixed(2)}`}
+                        {isEmployeeMeal
+                          ? <span className="text-green-700">$0.00 <span className="text-xs font-normal">(Employee Meal)</span></span>
+                          : `$${total.toFixed(2)}`}
                       </span>
                     </div>
                   </div>
@@ -526,7 +567,7 @@ export default function ReceiptsPage() {
                 data-testid="button-checkout"
               >
                 {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ReceiptText className="h-5 w-5" />}
-                {isEmployeeMeal ? "Log Employee Meal — $0.00" : `Complete Sale — $${total.toFixed(2)}`}
+                {isEmployeeMeal ? "Log Employee Meal — $0.00" : discountPct > 0 ? `Complete Sale — $${total.toFixed(2)} (${discountPct}% off)` : `Complete Sale — $${total.toFixed(2)}`}
               </Button>
             </CardContent>
           </Card>
@@ -577,6 +618,11 @@ export default function ReceiptsPage() {
                         <Badge variant="secondary" className="rounded-none font-mono text-xs">{receipt.status}</Badge>
                         {(receipt as any).isEmployeeMeal && (
                           <Badge className="rounded-none font-mono text-xs bg-green-100 text-green-800 hover:bg-green-100" data-testid={`badge-employee-meal-${receipt.id}`}>Employee Meal</Badge>
+                        )}
+                        {parseFloat((receipt as any).discountPercent ?? "0") > 0 && (
+                          <Badge className="rounded-none font-mono text-xs bg-orange-100 text-orange-800 hover:bg-orange-100 gap-1" data-testid={`badge-discount-${receipt.id}`}>
+                            <Tag className="h-2.5 w-2.5" />{parseFloat((receipt as any).discountPercent).toFixed(0)}% off
+                          </Badge>
                         )}
                       </div>
                     </TableCell>
