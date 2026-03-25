@@ -27,6 +27,31 @@ export async function runMigrations() {
         ADD COLUMN IF NOT EXISTS sale_amount DECIMAL(10,2) NOT NULL DEFAULT '0';
     `).catch(() => {});
 
+    await pool.query(`
+      ALTER TABLE receipts
+        ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) NOT NULL DEFAULT '0';
+    `).catch(() => {});
+
+    await pool.query(`
+      ALTER TABLE contract_orders
+        ADD COLUMN IF NOT EXISTS line_items TEXT;
+    `).catch(() => {});
+
+    await pool.query(`
+      ALTER TABLE contract_orders
+        ADD COLUMN IF NOT EXISTS delivery_fee DECIMAL(10,2) NOT NULL DEFAULT '0';
+    `).catch(() => {});
+
+    await pool.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS is_original_owner BOOLEAN NOT NULL DEFAULT false;
+    `).catch(() => {});
+
+    await pool.query(`
+      UPDATE users SET is_original_owner = true
+      WHERE role = 'Owner' AND is_original_owner = false;
+    `).catch(() => {});
+
     console.log("[migrate] migrations applied successfully");
   } finally {
     await pool.end();
