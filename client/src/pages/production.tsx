@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw, History, PackageCheck } from "lucide-react";
+import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw, History, PackageCheck, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ export default function ProductionPage() {
   const canManage = user?.role === "Owner" || user?.role === "Manager";
 
   const [quantities, setQuantities] = useState<Record<number, string>>({});
+  const [historySearch, setHistorySearch] = useState("");
 
   const { data: menuItems = [], isLoading: itemsLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
@@ -133,6 +134,20 @@ export default function ProductionPage() {
       menuItemName: item.name,
     })));
   };
+
+  const groupedHistory = useMemo(() => {
+    const filtered = [...productionLogs]
+      .filter(l => !historySearch || l.menuItemName.toLowerCase().includes(historySearch.toLowerCase()))
+      .sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime());
+
+    const byDate: Record<string, ProductionLog[]> = {};
+    for (const log of filtered) {
+      const dateKey = new Date(log.loggedAt).toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+      if (!byDate[dateKey]) byDate[dateKey] = [];
+      byDate[dateKey].push(log);
+    }
+    return Object.entries(byDate);
+  }, [productionLogs, historySearch]);
 
   const CATEGORIES = ["Food", "Drinks", "Seasonal Food", "Seasonal Drinks"];
   const grouped = CATEGORIES.map(cat => ({
@@ -381,29 +396,67 @@ export default function ProductionPage() {
         {/* ── HISTORY TAB ── */}
         <TabsContent value="history">
           <div className="border border-border overflow-x-auto">
-            <div className="flex items-center gap-2 px-6 py-4 border-b border-border">
-              <History className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Production History</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 border-b border-border">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Production History</h2>
+                {productionLogs.length > 0 && (
+                  <span className="text-xs text-muted-foreground">({productionLogs.length} entries)</span>
+                )}
+              </div>
+              {productionLogs.length > 0 && (
+                <div className="relative w-full sm:w-56">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Filter by item…"
+                    value={historySearch}
+                    onChange={e => setHistorySearch(e.target.value)}
+                    className="rounded-none border-muted h-8 text-sm pl-8"
+                    data-testid="input-history-search"
+                  />
+                </div>
+              )}
             </div>
+
             {productionLogs.length === 0 ? (
               <div className="p-10 text-center text-muted-foreground text-sm">No production logged yet.</div>
+            ) : groupedHistory.length === 0 ? (
+              <div className="p-10 text-center text-muted-foreground text-sm">No results match "{historySearch}".</div>
             ) : (
-              <div className="divide-y divide-border">
-                {productionLogs.map(log => (
-                  <div key={log.id} className="flex items-center justify-between px-6 py-3" data-testid={`history-row-${log.id}`}>
-                    <div>
-                      <p className="text-sm font-medium">{log.menuItemName}</p>
-                      <p className="text-xs text-muted-foreground">{log.loggedBy} · {new Date(log.loggedAt).toLocaleString()}</p>
-                    </div>
-                    <div className="flex items-center gap-4 text-right">
-                      <div className="text-xs space-y-0.5">
-                        <p className="text-emerald-600 font-mono font-medium" data-testid={`history-sale-${log.id}`}>${parseFloat(log.saleAmount).toFixed(2)} sales</p>
-                        <p className="text-muted-foreground font-mono" data-testid={`history-cost-${log.id}`}>${parseFloat(log.ingredientCost).toFixed(2)} cost</p>
+              <div>
+                {groupedHistory.map(([dateLabel, logs]) => {
+                  const dayTotal = logs.reduce((s, l) => s + l.quantity, 0);
+                  const daySales = logs.reduce((s, l) => s + parseFloat(l.saleAmount), 0);
+                  return (
+                    <div key={dateLabel}>
+                      <div className="flex items-center justify-between px-6 py-2 bg-muted/20 border-b border-border sticky top-0">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{dateLabel}</span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {dayTotal} pcs · <span className="text-emerald-600">${daySales.toFixed(2)}</span>
+                        </span>
                       </div>
-                      <Badge variant="secondary" className="rounded-none font-mono shrink-0">{log.quantity} pcs</Badge>
+                      <div className="divide-y divide-border">
+                        {logs.map(log => (
+                          <div key={log.id} className="flex items-center justify-between px-6 py-3" data-testid={`history-row-${log.id}`}>
+                            <div>
+                              <p className="text-sm font-medium">{log.menuItemName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {log.loggedBy} · {new Date(log.loggedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-4 text-right">
+                              <div className="text-xs space-y-0.5">
+                                <p className="text-emerald-600 font-mono font-medium" data-testid={`history-sale-${log.id}`}>${parseFloat(log.saleAmount).toFixed(2)} sales</p>
+                                <p className="text-muted-foreground font-mono" data-testid={`history-cost-${log.id}`}>${parseFloat(log.ingredientCost).toFixed(2)} cost</p>
+                              </div>
+                              <Badge variant="secondary" className="rounded-none font-mono shrink-0">{log.quantity} pcs</Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
