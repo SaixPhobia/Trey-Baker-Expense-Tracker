@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw, History, PackageCheck, Search } from "lucide-react";
+import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw, History, PackageCheck, Search, ArrowUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,7 @@ export default function ProductionPage() {
 
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [historySearch, setHistorySearch] = useState("");
+  const [historySortDir, setHistorySortDir] = useState<"desc" | "asc">("desc");
 
   const { data: menuItems = [], isLoading: itemsLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
@@ -137,17 +138,28 @@ export default function ProductionPage() {
 
   const groupedHistory = useMemo(() => {
     const filtered = [...productionLogs]
-      .filter(l => !historySearch || l.menuItemName.toLowerCase().includes(historySearch.toLowerCase()))
-      .sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime());
+      .filter(l => !historySearch || l.menuItemName.toLowerCase().includes(historySearch.toLowerCase()));
 
-    const byDate: Record<string, ProductionLog[]> = {};
+    const byDateMap = new Map<string, { ts: number; logs: ProductionLog[] }>();
     for (const log of filtered) {
-      const dateKey = new Date(log.loggedAt).toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
-      if (!byDate[dateKey]) byDate[dateKey] = [];
-      byDate[dateKey].push(log);
+      const d = new Date(log.loggedAt);
+      const dateKey = d.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+      const dayTs = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      if (!byDateMap.has(dateKey)) byDateMap.set(dateKey, { ts: dayTs, logs: [] });
+      byDateMap.get(dateKey)!.logs.push(log);
     }
-    return Object.entries(byDate);
-  }, [productionLogs, historySearch]);
+
+    return [...byDateMap.entries()]
+      .sort(([, a], [, b]) => historySortDir === "desc" ? b.ts - a.ts : a.ts - b.ts)
+      .map(([dateLabel, { logs }]) => ({
+        dateLabel,
+        logs: [...logs].sort((a, b) =>
+          historySortDir === "desc"
+            ? new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime()
+            : new Date(a.loggedAt).getTime() - new Date(b.loggedAt).getTime()
+        ),
+      }));
+  }, [productionLogs, historySearch, historySortDir]);
 
   const CATEGORIES = ["Food", "Drinks", "Seasonal Food", "Seasonal Drinks"];
   const grouped = CATEGORIES.map(cat => ({
@@ -405,15 +417,27 @@ export default function ProductionPage() {
                 )}
               </div>
               {productionLogs.length > 0 && (
-                <div className="relative w-full sm:w-56">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                  <Input
-                    placeholder="Filter by item…"
-                    value={historySearch}
-                    onChange={e => setHistorySearch(e.target.value)}
-                    className="rounded-none border-muted h-8 text-sm pl-8"
-                    data-testid="input-history-search"
-                  />
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-none h-8 text-xs gap-1.5 shrink-0"
+                    onClick={() => setHistorySortDir(d => d === "desc" ? "asc" : "desc")}
+                    data-testid="button-sort-history"
+                  >
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    {historySortDir === "desc" ? "Newest first" : "Oldest first"}
+                  </Button>
+                  <div className="relative flex-1 sm:w-56">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                    <Input
+                      placeholder="Filter by item…"
+                      value={historySearch}
+                      onChange={e => setHistorySearch(e.target.value)}
+                      className="rounded-none border-muted h-8 text-sm pl-8"
+                      data-testid="input-history-search"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -424,7 +448,7 @@ export default function ProductionPage() {
               <div className="p-10 text-center text-muted-foreground text-sm">No results match "{historySearch}".</div>
             ) : (
               <div>
-                {groupedHistory.map(([dateLabel, logs]) => {
+                {groupedHistory.map(({ dateLabel, logs }) => {
                   const dayTotal = logs.reduce((s, l) => s + l.quantity, 0);
                   const daySales = logs.reduce((s, l) => s + parseFloat(l.saleAmount), 0);
                   return (
