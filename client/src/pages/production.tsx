@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw, History, PackageCheck, Search, ArrowUpDown } from "lucide-react";
+import { Loader2, ChefHat, AlertTriangle, CheckCircle2, RotateCcw, History, PackageCheck, Search, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ export default function ProductionPage() {
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [historySearch, setHistorySearch] = useState("");
   const [historySortDir, setHistorySortDir] = useState<"desc" | "asc">("desc");
+  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
 
   const { data: menuItems = [], isLoading: itemsLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
@@ -136,27 +137,59 @@ export default function ProductionPage() {
     })));
   };
 
+  type Batch = {
+    batchKey: string;
+    loggedBy: string;
+    loggedAt: Date;
+    items: ProductionLog[];
+    totalPcs: number;
+    totalSales: number;
+    totalCost: number;
+  };
+
   const groupedHistory = useMemo(() => {
     const filtered = [...productionLogs]
       .filter(l => !historySearch || l.menuItemName.toLowerCase().includes(historySearch.toLowerCase()));
 
-    const byDateMap = new Map<string, { ts: number; logs: ProductionLog[] }>();
+    const batchMap = new Map<string, Batch>();
     for (const log of filtered) {
-      const d = new Date(log.loggedAt);
+      const key = log.batchId ?? `solo_${log.id}`;
+      if (!batchMap.has(key)) {
+        batchMap.set(key, {
+          batchKey: key,
+          loggedBy: log.loggedBy,
+          loggedAt: new Date(log.loggedAt),
+          items: [],
+          totalPcs: 0,
+          totalSales: 0,
+          totalCost: 0,
+        });
+      }
+      const b = batchMap.get(key)!;
+      b.items.push(log);
+      b.totalPcs += log.quantity;
+      b.totalSales += parseFloat(log.saleAmount);
+      b.totalCost += parseFloat(log.ingredientCost);
+      if (new Date(log.loggedAt) < b.loggedAt) b.loggedAt = new Date(log.loggedAt);
+    }
+
+    const byDateMap = new Map<string, { ts: number; batches: Batch[] }>();
+    for (const batch of batchMap.values()) {
+      const d = batch.loggedAt;
       const dateKey = d.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
       const dayTs = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-      if (!byDateMap.has(dateKey)) byDateMap.set(dateKey, { ts: dayTs, logs: [] });
-      byDateMap.get(dateKey)!.logs.push(log);
+      if (!byDateMap.has(dateKey)) byDateMap.set(dateKey, { ts: dayTs, batches: [] });
+      byDateMap.get(dateKey)!.batches.push(batch);
     }
 
     return [...byDateMap.entries()]
       .sort(([, a], [, b]) => historySortDir === "desc" ? b.ts - a.ts : a.ts - b.ts)
-      .map(([dateLabel, { logs }]) => ({
+      .map(([dateLabel, { ts, batches }]) => ({
         dateLabel,
-        logs: [...logs].sort((a, b) =>
+        batches: [...batches].sort((a, b) =>
           historySortDir === "desc"
-            ? new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime()
-            : new Date(a.loggedAt).getTime() - new Date(b.loggedAt).getTime()
+            ? b.loggedAt.getTime() - a.loggedAt.getTime()
+            : a.loggedAt.getTime() - b.loggedAt.getTime()
         ),
       }));
   }, [productionLogs, historySearch, historySortDir]);
@@ -448,35 +481,79 @@ export default function ProductionPage() {
               <div className="p-10 text-center text-muted-foreground text-sm">No results match "{historySearch}".</div>
             ) : (
               <div>
-                {groupedHistory.map(({ dateLabel, logs }) => {
-                  const dayTotal = logs.reduce((s, l) => s + l.quantity, 0);
-                  const daySales = logs.reduce((s, l) => s + parseFloat(l.saleAmount), 0);
+                {groupedHistory.map(({ dateLabel, batches }) => {
+                  const dayTotal = batches.reduce((s, b) => s + b.totalPcs, 0);
+                  const daySales = batches.reduce((s, b) => s + b.totalSales, 0);
                   return (
                     <div key={dateLabel}>
                       <div className="flex items-center justify-between px-6 py-2 bg-muted/20 border-b border-border sticky top-0">
                         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{dateLabel}</span>
                         <span className="text-xs text-muted-foreground font-mono">
-                          {dayTotal} pcs · <span className="text-emerald-600">${daySales.toFixed(2)}</span>
+                          {batches.length} {batches.length === 1 ? "batch" : "batches"} · {dayTotal} pcs · <span className="text-emerald-600">${daySales.toFixed(2)}</span>
                         </span>
                       </div>
                       <div className="divide-y divide-border">
-                        {logs.map(log => (
-                          <div key={log.id} className="flex items-center justify-between px-6 py-3" data-testid={`history-row-${log.id}`}>
-                            <div>
-                              <p className="text-sm font-medium">{log.menuItemName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {log.loggedBy} · {new Date(log.loggedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
-                              </p>
+                        {batches.map(batch => {
+                          const isExpanded = expandedBatches.has(batch.batchKey);
+                          const toggle = () => setExpandedBatches(prev => {
+                            const next = new Set(prev);
+                            isExpanded ? next.delete(batch.batchKey) : next.add(batch.batchKey);
+                            return next;
+                          });
+                          return (
+                            <div key={batch.batchKey} data-testid={`batch-row-${batch.batchKey}`}>
+                              <button
+                                onClick={toggle}
+                                className="w-full flex items-center justify-between px-6 py-3 hover:bg-muted/20 transition-colors text-left"
+                                data-testid={`batch-toggle-${batch.batchKey}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  {isExpanded
+                                    ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      {batch.items.length === 1
+                                        ? batch.items[0].menuItemName
+                                        : `${batch.items.length} items`}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {batch.loggedBy} · {batch.loggedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-4 text-right shrink-0">
+                                  <div className="text-xs space-y-0.5">
+                                    <p className="text-emerald-600 font-mono font-medium">${batch.totalSales.toFixed(2)} sales</p>
+                                    <p className="text-muted-foreground font-mono">${batch.totalCost.toFixed(2)} cost</p>
+                                  </div>
+                                  <Badge variant="secondary" className="rounded-none font-mono">{batch.totalPcs} pcs</Badge>
+                                </div>
+                              </button>
+
+                              {isExpanded && (
+                                <div className="border-t border-dashed border-border bg-muted/10">
+                                  {batch.items.map((log, idx) => (
+                                    <div
+                                      key={log.id}
+                                      className={`flex items-center justify-between pl-14 pr-6 py-2.5 ${idx < batch.items.length - 1 ? "border-b border-dashed border-border/50" : ""}`}
+                                      data-testid={`history-row-${log.id}`}
+                                    >
+                                      <p className="text-sm text-muted-foreground">{log.menuItemName}</p>
+                                      <div className="flex items-center gap-4 text-right">
+                                        <div className="text-xs space-y-0.5">
+                                          <p className="text-emerald-600 font-mono">${parseFloat(log.saleAmount).toFixed(2)}</p>
+                                          <p className="text-muted-foreground font-mono">${parseFloat(log.ingredientCost).toFixed(2)} cost</p>
+                                        </div>
+                                        <Badge variant="outline" className="rounded-none font-mono text-xs">{log.quantity} pcs</Badge>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            <div className="flex items-center gap-4 text-right">
-                              <div className="text-xs space-y-0.5">
-                                <p className="text-emerald-600 font-mono font-medium" data-testid={`history-sale-${log.id}`}>${parseFloat(log.saleAmount).toFixed(2)} sales</p>
-                                <p className="text-muted-foreground font-mono" data-testid={`history-cost-${log.id}`}>${parseFloat(log.ingredientCost).toFixed(2)} cost</p>
-                              </div>
-                              <Badge variant="secondary" className="rounded-none font-mono shrink-0">{log.quantity} pcs</Badge>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   );

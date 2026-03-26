@@ -110,6 +110,7 @@ export type ReceiptItem = typeof receiptItems.$inferSelect;
 
 export const productionLogs = pgTable("production_logs", {
   id: serial("id").primaryKey(),
+  batchId: text("batch_id"),
   menuItemId: integer("menu_item_id").notNull(),
   menuItemName: text("menu_item_name").notNull(),
   quantity: integer("quantity").notNull(),

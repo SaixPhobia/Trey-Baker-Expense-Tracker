@@ -214,13 +214,14 @@ export async function registerRoutes(
     const userId = (req.session as any).userId as string;
     const sessionUser = await storage.getUser(userId);
     const loggedBy = sessionUser?.displayName || sessionUser?.username || "";
+    const batchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const results = [];
     for (const entry of parsed.data) {
       const r = await storage.deductIngredients(entry.menuItemId, entry.quantity);
       const ingredientCost = r.reduce((sum, x) => sum + x.cost, 0).toFixed(2);
       const menuItem = await storage.getMenuItem(entry.menuItemId);
       const saleAmount = menuItem ? (parseFloat(menuItem.basePrice) * entry.quantity).toFixed(2) : "0";
-      await storage.createProductionLog({ menuItemId: entry.menuItemId, menuItemName: entry.menuItemName, quantity: entry.quantity, loggedBy, ingredientCost, saleAmount });
+      await storage.createProductionLog({ batchId, menuItemId: entry.menuItemId, menuItemName: entry.menuItemName, quantity: entry.quantity, loggedBy, ingredientCost, saleAmount });
       results.push(...r);
     }
     res.json(results);

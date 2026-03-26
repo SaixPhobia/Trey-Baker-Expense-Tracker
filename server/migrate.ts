@@ -52,6 +52,11 @@ export async function runMigrations() {
       WHERE role = 'Owner' AND is_original_owner = false;
     `).catch(() => {});
 
+    await pool.query(`
+      ALTER TABLE production_logs
+        ADD COLUMN IF NOT EXISTS batch_id TEXT;
+    `).catch(() => {});
+
     console.log("[migrate] migrations applied successfully");
   } finally {
     await pool.end();
