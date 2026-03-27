@@ -124,6 +124,8 @@ export function setupAuth(app: Express) {
       return res.status(401).json({ error: "User not found" });
     }
 
+    storage.updateLastSeen(userId).catch(() => {});
+
     res.json({
       id: user.id,
       username: user.username,

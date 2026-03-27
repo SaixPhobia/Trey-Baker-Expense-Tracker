@@ -338,6 +338,7 @@ export async function registerRoutes(
       displayName: u.displayName,
       role: u.role,
       password: u.password,
+      lastSeenAt: u.lastSeenAt,
     })));
   });
 

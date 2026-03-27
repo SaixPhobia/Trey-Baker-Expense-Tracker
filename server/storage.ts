@@ -26,6 +26,7 @@ export interface IStorage {
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
   updateUserPassword(id: string, hashedPassword: string): Promise<boolean>;
+  updateLastSeen(id: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
   
   getIngredients(): Promise<Ingredient[]>;
@@ -134,6 +135,10 @@ export class DatabaseStorage implements IStorage {
   async updateUserPassword(id: string, hashedPassword: string): Promise<boolean> {
     const [updated] = await db.update(users).set({ password: hashedPassword }).where(eq(users.id, id)).returning();
     return !!updated;
+  }
+
+  async updateLastSeen(id: string): Promise<void> {
+    await db.update(users).set({ lastSeenAt: new Date() }).where(eq(users.id, id));
   }
 
   async getAllUsers(): Promise<User[]> {

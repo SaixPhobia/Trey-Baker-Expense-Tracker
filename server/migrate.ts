@@ -57,6 +57,11 @@ export async function runMigrations() {
         ADD COLUMN IF NOT EXISTS batch_id TEXT;
     `).catch(() => {});
 
+    await pool.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP;
+    `).catch(() => {});
+
     console.log("[migrate] migrations applied successfully");
   } finally {
     await pool.end();

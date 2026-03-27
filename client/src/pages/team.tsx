@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Users, Shield, ShieldCheck, User, Trash2, KeyRound } from "lucide-react";
+import { Loader2, Users, Shield, ShieldCheck, User, Trash2, KeyRound, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useState } from "react";
@@ -38,6 +38,20 @@ interface TeamMember {
   displayName: string;
   role: string;
   password: string;
+  lastSeenAt: string | null;
+}
+
+function relativeTime(dateStr: string | null): { label: string; online: boolean } {
+  if (!dateStr) return { label: "Never", online: false };
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 5) return { label: "Online now", online: true };
+  if (mins < 60) return { label: `${mins}m ago`, online: false };
+  if (hrs < 24) return { label: `${hrs}h ago`, online: false };
+  if (days === 1) return { label: "Yesterday", online: false };
+  return { label: new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" }), online: false };
 }
 
 const ROLE_ICONS: Record<string, typeof Shield> = {
@@ -188,6 +202,7 @@ export default function TeamPage() {
                   <TableHead className="font-serif text-primary font-bold">Username</TableHead>
                   <TableHead className="font-serif text-primary font-bold">Password</TableHead>
                   <TableHead className="font-serif text-primary font-bold">Role</TableHead>
+                  <TableHead className="font-serif text-primary font-bold">Last Active</TableHead>
                   <TableHead className="font-serif text-primary font-bold w-[200px]">Change Role</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
@@ -228,6 +243,19 @@ export default function TeamPage() {
                             <RoleIcon className="mr-1 h-3 w-3 inline" />
                             {member.role}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const { label, online } = relativeTime(member.lastSeenAt);
+                            return (
+                              <div className="flex items-center gap-1.5" data-testid={`text-last-seen-${member.id}`}>
+                                {online
+                                  ? <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                  : <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                                <span className={`text-xs ${online ? "text-emerald-600 font-medium" : "text-muted-foreground"}`}>{label}</span>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           {!user?.isOriginalOwner ? (

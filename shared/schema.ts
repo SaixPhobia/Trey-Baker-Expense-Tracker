@@ -175,6 +175,7 @@ export const users = pgTable("users", {
   displayName: text("display_name").notNull().default(""),
   role: text("role").notNull().default("Staff"),
   isOriginalOwner: boolean("is_original_owner").notNull().default(false),
+  lastSeenAt: timestamp("last_seen_at"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
