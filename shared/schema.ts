@@ -10,6 +10,7 @@ export const ingredients = pgTable("ingredients", {
   unit: text("unit").notNull(),
   costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(),
+  unitsPerCase: decimal("units_per_case", { precision: 10, scale: 2 }),
 });
 
 export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true });

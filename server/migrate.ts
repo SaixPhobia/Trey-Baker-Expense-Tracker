@@ -62,6 +62,11 @@ export async function runMigrations() {
         ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP;
     `).catch(() => {});
 
+    await pool.query(`
+      ALTER TABLE ingredients
+        ADD COLUMN IF NOT EXISTS units_per_case DECIMAL(10,2);
+    `).catch(() => {});
+
     console.log("[migrate] migrations applied successfully");
   } finally {
     await pool.end();
