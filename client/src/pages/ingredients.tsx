@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Loader2, Package, Pencil, Boxes } from "lucide-react";
+import { Plus, Trash2, Loader2, Package, Pencil, Boxes, PackagePlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +58,8 @@ export default function IngredientsPage() {
   });
   const [buyByCase, setBuyByCase] = useState(false);
   const [caseForm, setCaseForm] = useState({ cases: "", casePrice: "", unitsPerCase: "50" });
+  const [receivingIngredient, setReceivingIngredient] = useState<Ingredient | null>(null);
+  const [receiveCases, setReceiveCases] = useState("");
 
   const { data: ingredients = [], isLoading } = useQuery<Ingredient[]>({
     queryKey: ["/api/ingredients"],
@@ -110,6 +112,31 @@ export default function IngredientsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
       toast({ title: "Ingredient Deleted", description: "Ingredient has been removed.", variant: "destructive" });
     }
+  });
+
+  const receiveMutation = useMutation({
+    mutationFn: async ({ ingredient, cases }: { ingredient: Ingredient; cases: number }) => {
+      const upc = parseFloat(ingredient.unitsPerCase!);
+      const added = cases * upc;
+      const newQty = (parseFloat(ingredient.quantity) + added).toFixed(2);
+      const res = await fetch(`/api/ingredients/${ingredient.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: newQty }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: (_data, { ingredient, cases }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
+      setReceivingIngredient(null);
+      setReceiveCases("");
+      const upc = parseFloat(ingredient.unitsPerCase!);
+      toast({
+        title: "Stock Updated",
+        description: `Added ${cases} case${cases !== 1 ? "s" : ""} (${(cases * upc).toLocaleString()} units) to ${ingredient.name}.`,
+      });
+    },
   });
 
   const handleEditIngredient = (ingredient: Ingredient) => {
@@ -432,12 +459,26 @@ export default function IngredientsPage() {
                         <TableCell className="font-mono text-sm">{ingredient.unit}</TableCell>
                         <TableCell className="text-right" data-testid={`text-cases-${ingredient.id}`}>
                           {cases !== null ? (
-                            <div className="flex items-center justify-end gap-1.5">
-                              <Boxes className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="font-mono font-semibold text-sm text-primary">{cases}</span>
-                              <span className="text-xs text-muted-foreground">
-                                of {parseFloat(ingredient.unitsPerCase!).toFixed(0)}/cs
-                              </span>
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <Boxes className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="font-mono font-semibold text-sm text-primary">{cases}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  of {parseFloat(ingredient.unitsPerCase!).toFixed(0)}/cs
+                                </span>
+                              </div>
+                              {canManage && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-primary hover:bg-primary/10"
+                                  title="Receive cases"
+                                  data-testid={`button-receive-${ingredient.id}`}
+                                  onClick={() => { setReceivingIngredient(ingredient); setReceiveCases(""); }}
+                                >
+                                  <PackagePlus className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-xs">—</span>
@@ -481,6 +522,78 @@ export default function IngredientsPage() {
             </Table>
           </div>
         )}
+
+        {/* Receive Cases Dialog */}
+        <Dialog open={!!receivingIngredient} onOpenChange={(open) => { if (!open) { setReceivingIngredient(null); setReceiveCases(""); } }}>
+          <DialogContent className="rounded-none sm:max-w-[360px]">
+            <DialogHeader>
+              <DialogTitle className="font-serif flex items-center gap-2">
+                <PackagePlus className="h-5 w-5 text-primary" />
+                Receive Cases
+              </DialogTitle>
+            </DialogHeader>
+            {receivingIngredient && (
+              <div className="grid gap-4 py-2">
+                <div className="bg-muted/30 border border-border px-4 py-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Ingredient</p>
+                  <p className="font-medium text-foreground">{receivingIngredient.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {parseFloat(receivingIngredient.unitsPerCase!).toFixed(0)} units per case
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="receive-cases">How many cases received?</Label>
+                  <Input
+                    id="receive-cases"
+                    type="number"
+                    step="1"
+                    min="1"
+                    autoFocus
+                    data-testid="input-receive-cases"
+                    value={receiveCases}
+                    onChange={(e) => setReceiveCases(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && receiveCases && parseFloat(receiveCases) > 0) {
+                        receiveMutation.mutate({ ingredient: receivingIngredient, cases: parseFloat(receiveCases) });
+                      }
+                    }}
+                    placeholder="0"
+                    className="rounded-none border-muted text-lg font-mono"
+                  />
+                </div>
+
+                {receiveCases && parseFloat(receiveCases) > 0 && (
+                  <div className="bg-secondary/30 border border-border px-4 py-3 grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Units Added</p>
+                      <p className="font-mono font-bold text-primary">
+                        +{(parseFloat(receiveCases) * parseFloat(receivingIngredient.unitsPerCase!)).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">New Total</p>
+                      <p className="font-mono font-bold text-primary">
+                        {(parseFloat(receivingIngredient.quantity) + parseFloat(receiveCases) * parseFloat(receivingIngredient.unitsPerCase!)).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                onClick={() => receiveMutation.mutate({ ingredient: receivingIngredient!, cases: parseFloat(receiveCases) })}
+                disabled={!receiveCases || parseFloat(receiveCases) <= 0 || receiveMutation.isPending}
+                className="rounded-none w-full"
+                data-testid="button-confirm-receive"
+              >
+                {receiveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Add to Stock
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Dialog */}
         <Dialog open={!!editingIngredient} onOpenChange={(open) => { if (!open) setEditingIngredient(null); }}>
