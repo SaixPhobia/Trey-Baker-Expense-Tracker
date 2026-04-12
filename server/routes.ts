@@ -207,7 +207,7 @@ export async function registerRoutes(
     res.json(logs);
   });
 
-  app.post("/api/production/log-batch", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+  app.post("/api/production/log-batch", requireAuth, async (req, res) => {
     const schema = z.array(z.object({ menuItemId: z.number(), quantity: z.number().int().min(1), menuItemName: z.string() }));
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });

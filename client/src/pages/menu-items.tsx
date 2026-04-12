@@ -544,7 +544,7 @@ export default function MenuItemsPage() {
                       )}
                       <CardFooter className="pt-2 flex flex-wrap gap-1 justify-between">
                         <IngredientsDialog menuItem={item} canManage={canManage} />
-                        {canManage && <LogProductionDialog menuItem={item} />}
+                        <LogProductionDialog menuItem={item} />
                         {canManage && (
                           <div className="flex gap-1">
                             <Button
