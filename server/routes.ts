@@ -227,7 +227,7 @@ export async function registerRoutes(
     res.json(results);
   });
 
-  app.post("/api/menu-items/:id/log-production", requireAuth, requireRole("Owner", "Manager"), async (req, res) => {
+  app.post("/api/menu-items/:id/log-production", requireAuth, async (req, res) => {
     const menuItemId = getParamId(req);
     const { quantity } = req.body;
     const qty = parseInt(quantity);

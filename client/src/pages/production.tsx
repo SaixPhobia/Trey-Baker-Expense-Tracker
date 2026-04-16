@@ -279,7 +279,7 @@ export default function ProductionPage() {
                               value={qty}
                               onChange={e => setQuantities(prev => ({ ...prev, [item.id]: e.target.value }))}
                               className="rounded-none border-muted w-20 text-center h-8 text-sm"
-                              disabled={!hasLinks || !canManage}
+                              disabled={!hasLinks}
                               data-testid={`input-qty-${item.id}`}
                             />
                             <span className="text-xs text-muted-foreground w-6">pcs</span>
@@ -350,20 +350,16 @@ export default function ProductionPage() {
                       ))}
                     </div>
 
-                    {canManage ? (
-                      <Button
-                        onClick={handleConfirm}
-                        className="rounded-none w-full"
-                        disabled={batchMutation.isPending}
-                        data-testid="button-confirm-batch"
-                      >
-                        {batchMutation.isPending
-                          ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Logging...</>
-                          : <><ChefHat className="h-4 w-4 mr-2" /> Log Production & Deduct Inventory</>}
-                      </Button>
-                    ) : (
-                      <p className="text-xs text-muted-foreground text-center">Only Owners and Managers can confirm production.</p>
-                    )}
+                    <Button
+                      onClick={handleConfirm}
+                      className="rounded-none w-full"
+                      disabled={batchMutation.isPending}
+                      data-testid="button-confirm-batch"
+                    >
+                      {batchMutation.isPending
+                        ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Logging...</>
+                        : <><ChefHat className="h-4 w-4 mr-2" /> Log Production & Deduct Inventory</>}
+                    </Button>
                   </>
                 )}
               </div>
